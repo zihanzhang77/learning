@@ -176,6 +176,22 @@ const Profile: React.FC = () => {
           <StatBox value={streak.toString()} label="累计学习天数" />
         </section>
 
+        <section className="px-6 mb-8">
+          <div 
+            onClick={handleModifyGoal}
+            className="bg-slate-50 rounded-2xl p-5 active:scale-[0.98] transition-transform cursor-pointer"
+          >
+            <GoalProgress 
+              icon="flag" 
+              label="每日目标" 
+              current={Math.round(goalProgress.current)} 
+              target={Math.round(goalProgress.target)} 
+              unit="分钟" 
+              progress={`${goalProgress.percentage}%`} 
+            />
+          </div>
+        </section>
+
         <section className="mt-8 border-t border-slate-50">
           <div className="flex items-center justify-between px-6 mb-4">
             <h3 className="text-[17px] font-semibold">账号安全</h3>
