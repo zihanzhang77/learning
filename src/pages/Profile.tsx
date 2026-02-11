@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { goalApi, statsApi, timerApi, authApi, userApi } from '../services/api';
+import { goalApi, statsApi, timerApi, authApi, userApi, timeConsumptionApi } from '../services/api';
 
 const Profile: React.FC = () => {
   const { user, logout, refreshUser } = useUser();
@@ -26,12 +26,20 @@ const Profile: React.FC = () => {
     if (!user) return;
     
     try {
-      const allStats = await statsApi.getStats(user.id, 'all');
-      const totalDaysData = await timerApi.getTotalDays(user.id);
-      const goal = await goalApi.getGoal(user.id);
-      const todayStats = await statsApi.getStats(user.id, 'day');
+      const [allStats, allTimeConsumption, totalDaysData, goal, todayStats] = await Promise.all([
+        statsApi.getStats(user.id, 'all'),
+        timeConsumptionApi.getTimeConsumptionRange(user.id, '2000-01-01', '2099-12-31'),
+        timerApi.getTotalDays(user.id),
+        goalApi.getGoal(user.id),
+        statsApi.getStats(user.id, 'day')
+      ]);
       
-      setTotalHours(allStats.total_hours || 0);
+      // 计算总学习时长（学习计时时间 + 手动输入的学习时间）
+      const totalManualStudyHours = allTimeConsumption.reduce((sum: number, item: any) => sum + (Number(item.study_hours) || 0), 0);
+      const totalTimerHours = Number(allStats.total_hours) || 0;
+      const allStudyHours = totalTimerHours + totalManualStudyHours;
+      
+      setTotalHours(allStudyHours);
       setStreak(totalDaysData.total_days || 0);
       // 将小时转换为分钟
       setDailyGoal((goal.daily_study_hours || 2) * 60);
@@ -163,7 +171,7 @@ const Profile: React.FC = () => {
         </section>
 
         <section className="px-6 py-2 flex justify-around mb-4">
-          <StatBox value={(totalHours * 60).toFixed(2)} label="累计学习时长" />
+          <StatBox value={totalHours.toFixed(1)} label="累计学习时长" />
           <div className="w-[1px] h-8 bg-slate-100 self-center"></div>
           <StatBox value={streak.toString()} label="累计学习天数" />
         </section>

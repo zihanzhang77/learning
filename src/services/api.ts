@@ -148,20 +148,39 @@ export const timerApi = {
   },
   getStreak: async (userId: string) => {
     // 简单计算：查询attendance表
-    const { count, error } = await supabase
-      .from('attendance')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    if (error) throw error;
-    return { streak: count || 0 };
+    try {
+      const { count, error } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      
+      if (error) {
+        // 如果表不存在，返回0而不是抛出错误
+        if (error.code === '42P01') return { streak: 0 };
+        throw error;
+      }
+      return { streak: count || 0 };
+    } catch (error) {
+      console.error('获取签到数据失败:', error);
+      return { streak: 0 };
+    }
   },
   getTotalDays: async (userId: string) => {
-    const { count, error } = await supabase
-      .from('attendance')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    if (error) throw error;
-    return { total_days: count || 0 };
+    try {
+      const { count, error } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+        
+      if (error) {
+        if (error.code === '42P01') return { total_days: 0 };
+        throw error;
+      }
+      return { total_days: count || 0 };
+    } catch (error) {
+      console.error('获取总天数失败:', error);
+      return { total_days: 0 };
+    }
   },
 };
 
@@ -319,43 +338,56 @@ export const timeConsumptionApi = {
     return data || [];
   },
   saveTimeConsumption: async (userId: string, date: string, workHours: number, gameHours: number, tiktokHours: number, studyHours: number) => {
-    // 检查是否存在
-    const { data: existing } = await supabase
-      .from('user_time_consumption')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('date', date)
-      .single();
+    try {
+      // 检查是否存在
+      const { data: existing, error: fetchError } = await supabase
+        .from('user_time_consumption')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .single();
       
-    if (existing) {
-      const { data, error } = await supabase
-        .from('user_time_consumption')
-        .update({
-          work_hours: workHours,
-          game_hours: gameHours,
-          tiktok_hours: tiktokHours,
-          study_hours: studyHours
-        })
-        .eq('id', existing.id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    } else {
-      const { data, error } = await supabase
-        .from('user_time_consumption')
-        .insert([{
-          user_id: userId,
-          date: date,
-          work_hours: workHours,
-          game_hours: gameHours,
-          tiktok_hours: tiktokHours,
-          study_hours: studyHours
-        }])
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      // 忽略找不到记录的错误，因为这意味着我们需要插入新记录
+      if (fetchError && fetchError.code !== 'PGRST116') {
+         if (fetchError.code === '42P01') {
+            throw new Error('数据库表 user_time_consumption 尚未创建，请联系管理员');
+         }
+         throw fetchError;
+      }
+        
+      if (existing) {
+        const { data, error } = await supabase
+          .from('user_time_consumption')
+          .update({
+            work_hours: workHours,
+            game_hours: gameHours,
+            tiktok_hours: tiktokHours,
+            study_hours: studyHours
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase
+          .from('user_time_consumption')
+          .insert([{
+            user_id: userId,
+            date: date,
+            work_hours: workHours,
+            game_hours: gameHours,
+            tiktok_hours: tiktokHours,
+            study_hours: studyHours
+          }])
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+    } catch (error: any) {
+      console.error('保存时间消耗失败:', error);
+      throw error;
     }
   },
 };
@@ -374,26 +406,42 @@ export const aiApi = {
 // 签到API
 export const attendanceApi = {
   getAttendance: async (userId: string) => {
-    const { data, error } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('user_id', userId);
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (error) {
+        if (error.code === '42P01') return []; // 表不存在
+        throw error;
+      }
+      return data;
+    } catch (error) {
+      console.error('获取签到列表失败:', error);
+      return [];
+    }
   },
   checkIn: async (userId: string, date: string) => {
-    const { data, error } = await supabase
-      .from('attendance')
-      .insert([{ user_id: userId, date: date }])
-      .select()
-      .single();
-      
-    if (error) {
-        if (error.code === '23505') { // Unique violation
-            return { error: '今天已经签到过了' };
-        }
-        return { error: error.message };
+    try {
+      const { data, error } = await supabase
+        .from('attendance')
+        .insert([{ user_id: userId, date: date }])
+        .select()
+        .single();
+        
+      if (error) {
+          if (error.code === '23505') { // Unique violation
+              return { error: '今天已经签到过了' };
+          }
+          if (error.code === '42P01') {
+             return { error: '数据库表尚未创建，请联系管理员' };
+          }
+          return { error: error.message };
+      }
+      return { status: 'ok', data };
+    } catch (error: any) {
+       return { error: error.message || '签到失败' };
     }
-    return { status: 'ok', data };
   },
 };

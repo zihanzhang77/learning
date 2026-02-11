@@ -58,9 +58,16 @@ const Dashboard: React.FC = () => {
       // 获取选定日期的时间消耗数据
       const selectedDateData = await timeConsumptionApi.getTimeConsumption(userId, selectedDate);
       
+      // 获取用户所有的时间消耗数据以计算手动输入的总学习时长
+      const allTimeConsumption = await timeConsumptionApi.getTimeConsumptionRange(userId, '2000-01-01', '2099-12-31');
+      const totalManualStudyHours = allTimeConsumption.reduce((sum: number, item: any) => sum + (Number(item.study_hours) || 0), 0);
+      
       // 计算总学习时长（学习计时时间 + 手动输入的学习时间）
-      const allStudyHours = (allStats.total_hours || 0) + (selectedDateData.study_hours || 0);
-      setTotalMinutes(allStudyHours * 60);
+      const totalTimerHours = Number(allStats.total_hours) || 0;
+      const allStudyHours = totalTimerHours + totalManualStudyHours;
+      
+      // setTotalMinutes 存储的是总分钟数
+      setTotalMinutes(Math.round(allStudyHours * 60));
       
       // 获取今日统计
       const todayStats = await statsApi.getStats(userId, 'day');
@@ -193,6 +200,22 @@ const Dashboard: React.FC = () => {
           <h3 className="text-sm font-bold text-slate-900">签到日历</h3>
         </div>
         <Calendar userId={user?.id} streak={streak} />
+      </div>
+
+      <div className="bg-white rounded-[2rem] p-6 shadow-soft border border-slate-50 mb-10">
+        <h3 className="font-bold text-slate-900 mb-6">今日数据概览</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <ProgressCard
+            value={Math.round((totalMinutes / 60) * 10) / 10} // 将分钟转回小时显示，保留一位小数
+            unit="累计小时"
+            label="累计学习时长"
+          />
+          <ProgressCard
+            value={todayProgress}
+            unit="%"
+            label="今日目标完成"
+          />
+        </div>
       </div>
 
       {/* 时间消耗输入部分 */}
