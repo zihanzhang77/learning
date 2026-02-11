@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { goalApi, statsApi, timerApi } from '../services/api';
+import { goalApi, statsApi, timerApi, authApi, userApi } from '../services/api';
 
 const Profile: React.FC = () => {
   const { user, logout, refreshUser } = useUser();
@@ -83,27 +83,16 @@ const Profile: React.FC = () => {
 
     try {
       // 调用 API 设置密码
-      const response = await fetch('http://localhost:3001/api/auth/set-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          password: password,
-        }),
-      });
-
-      const data = await response.json();
+      const response: any = await authApi.setPassword(user.id, password);
       
-      if (response.ok) {
+      if (response && (response.status === 'ok' || !response.error)) {
         alert('密码设置成功！');
         setShowPasswordModal(false);
         setPassword('');
         setConfirmPassword('');
         setPasswordError('');
       } else {
-        setPasswordError(data.error || '密码设置失败');
+        setPasswordError(response.error || '密码设置失败');
       }
     } catch (error) {
       console.error('设置密码失败:', error);
@@ -122,13 +111,9 @@ const Profile: React.FC = () => {
       formData.append('user_id', user.id);
 
       // 调用上传API
-      const response = await fetch('http://localhost:3001/api/user/avatar', {
-        method: 'POST',
-        body: formData,
-      });
+      const response: any = await userApi.uploadAvatar(user.id, formData);
 
-      if (response.ok) {
-        const data = await response.json();
+      if (response && (response.status === 'ok' || !response.error)) {
         // 刷新用户信息，更新头像URL
         await refreshUser();
         alert('头像上传成功！');

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { attendanceApi } from '../services/api';
 
 interface CalendarProps {
   userId: string | undefined;
@@ -64,24 +65,14 @@ const Calendar: React.FC<CalendarProps> = ({ userId, streak }) => {
       const date = formatDate(day);
       
       // 调用签到API
-      const response = await fetch('http://localhost:3001/api/attendance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          date: date,
-        }),
-      });
+      const response: any = await attendanceApi.checkIn(userId, date);
       
-      if (response.ok) {
+      if (response && (response.status === 'ok' || !response.error)) {
         // 更新本地签到数据
         setAttendanceData(prev => new Set(prev).add(date));
         alert('签到成功！');
       } else {
-        const error = await response.json();
-        alert(`签到失败：${error.error || '请重试'}`);
+        alert(`签到失败：${response.error || '请重试'}`);
       }
     } catch (error) {
       console.error('签到失败:', error);
@@ -97,10 +88,9 @@ const Calendar: React.FC<CalendarProps> = ({ userId, streak }) => {
     
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/attendance/${userId}`);
+      const data: any = await attendanceApi.getAttendance(userId);
       
-      if (response.ok) {
-        const data = await response.json();
+      if (Array.isArray(data)) {
         const dates = new Set(data.map((item: any) => item.date));
         setAttendanceData(dates);
       }
