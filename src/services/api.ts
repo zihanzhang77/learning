@@ -61,6 +61,17 @@ export const authApi = {
     
     return { user: data };
   },
+  resetPassword: async (phoneNumber: string, password: string) => {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ password_hash: password })
+      .eq('phone_number', phoneNumber)
+      .select();
+      
+    if (error) return { error: error.message };
+    if (!data || data.length === 0) return { error: '用户不存在' };
+    return { status: 'ok' };
+  },
   register: async (phoneNumber: string, password: string, name: string) => {
     // 检查是否存在
     const { data: existing } = await supabase

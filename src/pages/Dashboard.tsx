@@ -286,13 +286,16 @@ const Dashboard: React.FC = () => {
               const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
               const dayName = dayNames[dayIndex];
               
-              // 计算当前日期对应的那一天
+              // 计算当前周的对应日期
               const today = new Date();
               const currentDay = today.getDay();
-              const daysDiff = dayIndex - currentDay;
-              const targetDate = new Date(today);
-              targetDate.setDate(today.getDate() + daysDiff);
-              const targetDateString = targetDate.toISOString().split('T')[0];
+              const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+              const monday = new Date(today);
+              monday.setDate(today.getDate() - daysToMonday); // 本周一
+              
+              const targetDate = new Date(monday);
+              const targetDayIndex = dayIndex === 0 ? 6 : dayIndex - 1; // 转换成 0-6 (周一到周日)
+              targetDate.setDate(monday.getDate() + targetDayIndex);
               
               const isToday = dayIndex === currentDay;
               

@@ -9,6 +9,7 @@ const Login: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [isNewUser, setIsNewUser] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -53,8 +54,8 @@ const Login: React.FC = () => {
       return;
     }
 
-    if (isNewUser) {
-      if (!name) {
+    if (isNewUser || isForgotPassword) {
+      if (isNewUser && !name) {
         setError('请输入姓名');
         return;
       }
@@ -76,14 +77,27 @@ const Login: React.FC = () => {
       if (isNewUser) {
         // 新用户注册
         response = await authApi.register(phoneNumber, password, name);
+        login(response.user);
+        navigate('/');
+      } else if (isForgotPassword) {
+        // 忘记密码
+        response = await authApi.resetPassword(phoneNumber, password);
+        if (response.status === 'ok') {
+            alert('密码重置成功，请使用新密码登录');
+            setIsForgotPassword(false);
+            setPassword('');
+            setConfirmPassword('');
+        } else {
+            setError(response.error || '密码重置失败');
+        }
       } else {
         // 老用户登录
         response = await authApi.loginWithPassword(phoneNumber, password);
+        login(response.user);
+        navigate('/');
       }
-      login(response.user);
-      navigate('/');
     } catch (err: any) {
-      setError(err.message || '登录失败');
+      setError(err.message || '操作失败');
     } finally {
       setLoading(false);
     }
@@ -116,19 +130,19 @@ const Login: React.FC = () => {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-              密码
+              {isForgotPassword ? '新密码' : '密码'}
             </label>
             <input
               type="password"
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="请输入密码"
+              placeholder={isForgotPassword ? '请输入新密码' : '请输入密码'}
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent"
             />
           </div>
 
-          {isNewUser && (
+          {(isNewUser || isForgotPassword) && (
             <>
               <div>
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-1">
@@ -144,19 +158,21 @@ const Login: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
-                  姓名
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="请输入姓名"
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent"
-                />
-              </div>
+              {isNewUser && (
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
+                    姓名
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="请输入姓名"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent"
+                  />
+                </div>
+              )}
             </>
           )}
 
@@ -171,16 +187,37 @@ const Login: React.FC = () => {
             disabled={loading}
             className={`w-full px-4 py-3 bg-slate-900 text-white rounded-lg font-medium transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-800'}`}
           >
-            {loading ? (isNewUser ? '注册中...' : '登录中...') : (isNewUser ? '注册' : '登录')}
+            {loading ? '处理中...' : (isForgotPassword ? '重置密码' : (isNewUser ? '注册' : '登录'))}
           </button>
 
-          <div className="text-center">
-            <button
-              onClick={() => setIsNewUser(!isNewUser)}
-              className="text-secondary text-sm font-medium"
-            >
-              {isNewUser ? '已有账号？点击这里登录' : '新用户？点击这里注册'}
-            </button>
+          <div className="text-center flex flex-col gap-2">
+            {!isForgotPassword && (
+              <button
+                onClick={() => {
+                  setIsNewUser(!isNewUser);
+                  setIsForgotPassword(false);
+                  setError('');
+                }}
+                className="text-secondary text-sm font-medium"
+              >
+                {isNewUser ? '已有账号？点击这里登录' : '新用户？点击这里注册'}
+              </button>
+            )}
+            
+            {!isNewUser && (
+              <button
+                onClick={() => {
+                  setIsForgotPassword(!isForgotPassword);
+                  setIsNewUser(false);
+                  setError('');
+                  setPassword('');
+                  setConfirmPassword('');
+                }}
+                className="text-slate-400 text-sm font-medium hover:text-slate-600"
+              >
+                {isForgotPassword ? '返回登录' : '忘记密码？'}
+              </button>
+            )}
           </div>
         </div>
       </div>
