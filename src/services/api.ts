@@ -1,27 +1,115 @@
-// API基础配置
-const API_BASE_URL = 'https://learning-iota-ashy.vercel.app/api';
+// 模拟数据API服务
 
-// 通用请求函数
+// 模拟用户数据
+const mockUser = {
+  id: '1',
+  name: '张子涵',
+  phone_number: '15968723587',
+  avatar_url: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=user%20avatar&size=200x200'
+};
+
+// 通用请求函数 - 使用模拟数据
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  // 模拟网络延迟
+  await new Promise(resolve => setTimeout(resolve, 300));
   
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: '请求失败' }));
-    throw new Error(error.error || '请求失败');
+  // 根据请求路径返回模拟数据
+  if (endpoint.includes('/auth/login-with-password')) {
+    return { user: mockUser } as T;
   }
-
-  return response.json();
+  
+  if (endpoint.includes('/auth/register')) {
+    return { user: mockUser, message: '注册成功' } as T;
+  }
+  
+  if (endpoint.includes('/timer/streak')) {
+    return { streak: 2 } as T;
+  }
+  
+  if (endpoint.includes('/timer/total-days')) {
+    return { total_days: 2 } as T;
+  }
+  
+  if (endpoint.includes('/stats/')) {
+    return {
+      total_hours: 2.5,
+      daily_average: 1.25,
+      weekly_data: [
+        { day: '周一', hours: 1 },
+        { day: '周二', hours: 1.5 },
+        { day: '周三', hours: 0 },
+        { day: '周四', hours: 0 },
+        { day: '周五', hours: 0 },
+        { day: '周六', hours: 0 },
+        { day: '周日', hours: 0 }
+      ]
+    } as T;
+  }
+  
+  if (endpoint.includes('/stats/') && endpoint.includes('/weekly')) {
+    return {
+      labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+      datasets: [
+        {
+          label: '学习',
+          data: [1, 1.5, 0, 0, 0, 0, 0],
+          backgroundColor: '#10b981',
+          borderColor: '#10b981',
+          borderWidth: 1
+        },
+        {
+          label: '上班',
+          data: [8, 8, 8, 8, 8, 0, 0],
+          backgroundColor: '#3b82f6',
+          borderColor: '#3b82f6',
+          borderWidth: 1
+        },
+        {
+          label: '游戏',
+          data: [1, 0.5, 0, 0, 0, 0, 0],
+          backgroundColor: '#8b5cf6',
+          borderColor: '#8b5cf6',
+          borderWidth: 1
+        },
+        {
+          label: '抖音',
+          data: [0.5, 0.5, 0, 0, 0, 0, 0],
+          backgroundColor: '#ef4444',
+          borderColor: '#ef4444',
+          borderWidth: 1
+        }
+      ]
+    } as T;
+  }
+  
+  if (endpoint.includes('/goal/')) {
+    return {
+      total_study_hours: 100,
+      daily_study_minutes: 60
+    } as T;
+  }
+  
+  if (endpoint.includes('/time-consumption/')) {
+    return {
+      work_hours: 8,
+      game_hours: 1,
+      tiktok_hours: 0.5,
+      study_hours: 1
+    } as T;
+  }
+  
+  if (endpoint.includes('/ai/deepseek')) {
+    const prompt = JSON.parse(options.body as string).prompt;
+    return {
+      thought: `分析用户问题: ${prompt}`,
+      answer: `这是对问题"${prompt}"的回答。由于这是一个演示版本，我使用静态数据模拟AI响应。在实际部署中，这里会调用真实的DeepSeek API。`
+    } as T;
+  }
+  
+  return {} as T;
 }
 
 // 用户API
