@@ -137,27 +137,15 @@ const Stats: React.FC = () => {
                   responseDiv.innerHTML = '<p className="text-slate-400">AI 思考中...</p>';
                   
                   try {
-                    const response = await fetch('http://localhost:3001/api/ai/deepseek', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({ prompt: prompt.value }),
-                    });
-                    
-                    if (response.ok) {
-                      const data = await response.json();
-                      responseDiv.innerHTML = `
-                        <div className="p-3 bg-blue-50 rounded-lg">
-                          <p className="text-sm text-slate-600">${data.answer}</p>
-                        </div>
-                      `;
-                    } else {
-                      responseDiv.innerHTML = '<p className="text-red-500">AI 回答失败，请重试</p>';
-                    }
+                    const data = await aiApi.deepseek(prompt.value);
+                    responseDiv.innerHTML = `
+                      <div className="p-3 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-slate-600">${data.answer}</p>
+                      </div>
+                    `;
                   } catch (error) {
                     console.error('AI 请求失败:', error);
-                    responseDiv.innerHTML = '<p className="text-red-500">网络错误，请重试</p>';
+                    responseDiv.innerHTML = '<p className="text-red-500">AI 回答失败，请重试</p>';
                   }
                 }}
                 className="w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors flex items-center justify-center"
