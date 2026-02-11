@@ -23,10 +23,10 @@ declare global {
 
 // 配置multer
 const storage = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
     cb(null, uploadDir);
   },
-  filename: (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
