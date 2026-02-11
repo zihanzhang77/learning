@@ -52,11 +52,11 @@ export const sendSmsVerifyCode = async (phoneNumber: string): Promise<string> =>
     const resp = await client.sendSmsWithOptions(sendSmsRequest, runtime);
     console.log('短信发送响应:', resp.body);
     
-    if (resp.body.code === 'OK') {
+    if (resp.body && resp.body.code === 'OK') {
       console.log('短信发送成功，验证码:', code);
       return code;
     } else {
-      throw new Error(`短信发送失败: ${resp.body.message}`);
+      throw new Error(`短信发送失败: ${resp.body?.message || '未知错误'}`);
     }
   } catch (error) {
     console.error('短信发送异常:', error);

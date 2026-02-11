@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request } from 'express';
 import { supabase } from '../config/supabase.js';
 import multer from 'multer';
 import path from 'path';
@@ -12,12 +12,21 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// 扩展Request接口以包含file属性
+declare global {
+  namespace Express {
+    interface Request {
+      file?: Express.Multer.File;
+    }
+  }
+}
+
 // 配置multer
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
+  filename: (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }

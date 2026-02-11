@@ -6,6 +6,16 @@ const router = express.Router();
 const DEEPSEEK_API_KEY = 'sk-f03d0b3cc3c0459494945a0c7abdb745'; // 用户提供的 DeepSeek API Key
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
+// DeepSeek API 响应类型接口
+interface DeepSeekResponse {
+  choices: Array<{
+    message: {
+      role: string;
+      content: string;
+    };
+  }>;
+}
+
 // 调用 DeepSeek API 的端点
 router.post('/deepseek', async (req, res) => {
   try {
@@ -46,7 +56,7 @@ router.post('/deepseek', async (req, res) => {
       throw new Error(`DeepSeek API 响应失败: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as DeepSeekResponse;
     const aiResponse = data.choices[0].message.content;
 
     // 模拟 AI 思考过程（实际项目中可以让模型直接输出思考过程）
