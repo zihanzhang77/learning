@@ -46,20 +46,28 @@ export const authApi = {
     return { user: { id: 'mock-id', name: name || 'User', phone_number: phoneNumber } };
   },
   loginWithPassword: async (phoneNumber: string, password: string) => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('phone_number', phoneNumber)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('phone_number', phoneNumber)
+        .single();
+        
+      if (error) {
+        if (error.code === 'PGRST116') throw new Error('用户不存在');
+        throw error;
+      }
       
-    if (error) throw new Error('用户不存在');
-    
-    // 简单验证（注意：实际生产应使用Hash）
-    if (data.password_hash !== password) {
-       throw new Error('密码错误');
+      // 简单验证（注意：实际生产应使用Hash）
+      if (data.password_hash !== password) {
+         throw new Error('密码错误');
+      }
+      
+      return { user: data };
+    } catch (error: any) {
+      console.error('登录失败:', error);
+      throw error;
     }
-    
-    return { user: data };
   },
   resetPassword: async (phoneNumber: string, password: string) => {
     const { data, error } = await supabase
