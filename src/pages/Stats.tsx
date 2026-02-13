@@ -16,7 +16,12 @@ const Stats: React.FC = () => {
   const { user } = useUser();
   
   // 使用全局 AI Context
-  const { selectedTopic, setSelectedTopic, aiOutput, aiLoading, aiError, generatePlan } = useAi();
+  const { 
+    selectedTopic, setSelectedTopic, 
+    targetGoal, setTargetGoal,
+    currentLevel, setCurrentLevel,
+    aiOutput, aiLoading, aiError, generatePlan 
+  } = useAi();
 
   useEffect(() => {
     if (user) {
@@ -155,34 +160,66 @@ const Stats: React.FC = () => {
 
           {/* 底部输入区域 */}
           <div className="p-4 border-t border-slate-100">
-            <div className="flex gap-3 items-center">
-              <div className="relative flex-1">
-                <select
-                  value={selectedTopic}
-                  onChange={(e) => setSelectedTopic(e.target.value)}
-                  disabled={aiLoading}
-                  className="w-full appearance-none p-3 pl-4 pr-10 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50"
-                >
-                  <option value="雅思/托福">雅思/托福</option>
-                  <option value="视频剪辑">视频剪辑</option>
-                  <option value="自媒体运营">自媒体运营</option>
-                  <option value="电商运营">电商运营</option>
-                  <option value="演讲与口才表达">演讲与口才表达</option>
-                  <option value="理财与基金入门">理财与基金入门</option>
-                  <option value="AI 工具使用">AI 工具使用</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-                  <span className="material-symbols-outlined text-xl">expand_more</span>
+            <div className="flex flex-col gap-3">
+              {/* 第一步：选择学习内容 */}
+              <div className="relative w-full">
+                <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">学习内容</label>
+                <div className="relative">
+                  <select
+                    value={selectedTopic}
+                    onChange={(e) => setSelectedTopic(e.target.value)}
+                    disabled={aiLoading}
+                    className="w-full appearance-none p-3 pl-4 pr-10 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50"
+                  >
+                    <option value="雅思/托福">雅思/托福</option>
+                    <option value="视频剪辑">视频剪辑</option>
+                    <option value="自媒体运营">自媒体运营</option>
+                    <option value="电商运营">电商运营</option>
+                    <option value="演讲与口才表达">演讲与口才表达</option>
+                    <option value="理财与基金入门">理财与基金入门</option>
+                    <option value="AI 工具使用">AI 工具使用</option>
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                    <span className="material-symbols-outlined text-xl">expand_more</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                {/* 第二步：达成目标 */}
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">达成目标</label>
+                  <input
+                    type="text"
+                    value={targetGoal}
+                    onChange={(e) => setTargetGoal(e.target.value)}
+                    disabled={aiLoading}
+                    placeholder="如：考到7分 / 独立接单"
+                    className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"
+                  />
+                </div>
+
+                {/* 第三步：当前水平 */}
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">当前水平</label>
+                  <input
+                    type="text"
+                    value={currentLevel}
+                    onChange={(e) => setCurrentLevel(e.target.value)}
+                    disabled={aiLoading}
+                    placeholder="如：四级450 / 零基础"
+                    className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"
+                  />
                 </div>
               </div>
               
               <button
                 onClick={handleGeneratePlan}
-                disabled={aiLoading || !selectedTopic}
-                className="px-6 h-[46px] bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                disabled={aiLoading || !selectedTopic || !targetGoal || !currentLevel}
+                className="w-full h-[46px] bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 mt-2"
               >
                 <span className="material-symbols-outlined text-lg">auto_awesome</span>
-                生成计划
+                {aiLoading ? '生成计划中...' : '生成详细学习计划'}
               </button>
             </div>
           </div>
