@@ -218,8 +218,8 @@ const Stats: React.FC = () => {
                       prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
                       prose-strong:text-slate-900 prose-strong:font-black
                       prose-table:border-collapse prose-table:w-full prose-table:my-4 prose-table:rounded-lg prose-table:overflow-hidden prose-table:shadow-sm
-                      prose-th:border prose-th:border-slate-200 prose-th:bg-white prose-th:p-3 prose-th:text-xs prose-th:font-bold prose-th:text-slate-700 prose-th:text-left
-                      prose-td:border prose-td:border-slate-200 prose-td:bg-white/50 prose-td:p-3 prose-td:text-xs prose-td:text-slate-600
+                      prose-th:border-2 prose-th:border-slate-300 prose-th:bg-white prose-th:p-3 prose-th:text-xs prose-th:font-bold prose-th:text-slate-700 prose-th:text-left
+                      prose-td:border-2 prose-td:border-slate-300 prose-td:bg-white/50 prose-td:p-3 prose-td:text-xs prose-td:text-slate-600
                       prose-li:my-0.5 prose-p:my-2"
                   >
                     {aiOutput}
@@ -254,7 +254,7 @@ const Stats: React.FC = () => {
               <div className="flex flex-col gap-3">
                 {/* 第一步：选择学习内容 */}
                 <div className="relative w-full" ref={dropdownRef}>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">学习内容</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">学习目标</label>
                   <div className="relative">
                     <input
                       type="text"

@@ -562,7 +562,7 @@ export const aiApi = {
            body: JSON.stringify({
              model: 'deepseek-chat',
              messages: [
-                { role: 'system', content: mode === 'encouragement' ? '你是一个温暖、治愈的心理咨询师朋友。' : '你是一个专业的学习规划师。' },
+                { role: 'system', content: mode === 'encouragement' ? '你是一个活泼俏皮的朋友，说话大白话，会用口语化的表达鼓励人，不要太文艺。' : '你是一个专业的学习规划师。' },
                 { role: 'user', content: prompt }
              ],
              temperature: 0.7
@@ -596,7 +596,7 @@ export const aiApi = {
                 body: JSON.stringify({
                   model: 'deepseek-chat',
                   messages: [
-                     { role: 'system', content: mode === 'encouragement' ? '你是一个温暖、治愈的心理咨询师朋友。' : '你是一个专业的学习规划师。' },
+                     { role: 'system', content: mode === 'encouragement' ? '你是一个活泼俏皮的朋友，说话大白话，会用口语化的表达鼓励人，不要太文艺。' : '你是一个专业的学习规划师。' },
                      { role: 'user', content: prompt }
                   ],
                   temperature: 0.7
