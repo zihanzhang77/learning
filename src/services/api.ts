@@ -34,21 +34,41 @@ export const userApi = {
   },
   uploadAvatar: async (userId: string, formData: FormData) => {
     try {
-      // 使用后端API上传头像
+      // 1. 获取文件并转换为 Base64 (因为 Supabase 可能限制了 Content-Type 或者 RLS)
+      const file = formData.get('avatar') as File;
+      if (!file) throw new Error('没有文件');
+
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const base64Data = await base64Promise;
+
+      // 2. 调用后端 API，将文件和用户 ID 发送过去
       const response = await fetch(`${API_URL}/user/avatar`, {
         method: 'POST',
-        body: formData, // FormData会自动设置Content-Type
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          avatar_data: base64Data,
+          file_name: file.name
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('上传失败');
+        const errorData = await response.json();
+        throw new Error(errorData.error || '上传失败');
       }
 
       const data = await response.json();
       return { status: 'ok', ...data };
-    } catch (error) {
+    } catch (error: any) {
       console.error('上传头像错误:', error);
-      return { error: '上传失败' };
+      return { error: error.message || '上传失败' };
     }
   }
 };

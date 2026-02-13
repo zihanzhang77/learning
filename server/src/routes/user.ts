@@ -104,20 +104,32 @@ router.put('/:userId', async (req, res) => {
   }
 });
 
-// 上传头像
-router.post('/avatar', upload.single('avatar'), async (req, res) => {
+// 上传头像 (Base64 版本)
+router.post('/avatar', async (req, res) => {
   try {
-    const { user_id } = req.body;
-    const file = req.file;
+    const { user_id, avatar_data, file_name } = req.body;
 
-    if (!file || !user_id) {
-      return res.status(400).json({ error: '请提供头像文件和用户ID' });
+    if (!avatar_data || !user_id) {
+      return res.status(400).json({ error: '请提供头像数据和用户ID' });
     }
 
-    // 构建头像URL（使用相对URL，由前端代理处理）
-    const avatarUrl = `/uploads/${file.filename}`;
+    // 1. 处理 Base64 数据
+    const base64Content = avatar_data.split(';base64,').pop();
+    if (!base64Content) {
+      return res.status(400).json({ error: '无效的头像数据格式' });
+    }
 
-    // 更新用户的头像URL
+    // 2. 生成文件名并保存到本地
+    const ext = path.extname(file_name || 'avatar.png') || '.png';
+    const filename = `avatar-${user_id}-${Date.now()}${ext}`;
+    const filePath = path.join(uploadDir, filename);
+    
+    fs.writeFileSync(filePath, base64Content, { encoding: 'base64' });
+
+    // 3. 构建头像URL (相对路径)
+    const avatarUrl = `/uploads/${filename}`;
+
+    // 4. 更新 Supabase 数据库
     const { data: user, error } = await supabase
       .from('users')
       .update({

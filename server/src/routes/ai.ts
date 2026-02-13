@@ -4,7 +4,7 @@ const router = express.Router();
 
 // DeepSeek API 配置
 const DEEPSEEK_API_KEY = 'sk-c796903787ff48c297f3532c927d6143'; // 用户提供的 DeepSeek API Key
-const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
 // DeepSeek API 响应类型接口
 interface DeepSeekResponse {
@@ -74,6 +74,11 @@ router.post('/deepseek', async (req, res) => {
       },
       body: JSON.stringify(requestBody)
     });
+
+    if (response.status === 405) {
+      console.error('DeepSeek API 405 Method Not Allowed. URL:', DEEPSEEK_API_URL);
+      throw new Error('DeepSeek API 拒绝了请求 (405)。请检查 API 地址是否正确（应为 https://api.deepseek.com/v1/chat/completions 或 https://api.deepseek.com/chat/completions）');
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
