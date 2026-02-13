@@ -164,7 +164,7 @@ const Calendar: React.FC<CalendarProps> = ({ userId, streak }) => {
                   disabled={loading}
                   className="mt-1 text-xs px-2 py-1 bg-secondary text-white rounded-full hover:bg-secondary/80 disabled:opacity-50"
                 >
-                  {loading ? '签到中...' : '签到'}
+                  {loading ? '签到中...' : (dateStr < new Date().toISOString().split('T')[0] ? '补签' : '签到')}
                 </button>
               )}
               {checkedIn && (

@@ -124,7 +124,6 @@ const Diary: React.FC = () => {
     <div className="max-w-4xl mx-auto p-4 md:p-8 font-sans text-gray-800">
       <header className="mb-8 text-center md:text-left">
         <h1 className="text-3xl font-light tracking-wide text-gray-900 mb-2">学习日记本</h1>
-        <p className="text-gray-500 text-sm">记录点滴，见证成长</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">

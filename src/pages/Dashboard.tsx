@@ -257,8 +257,16 @@ const Dashboard: React.FC = () => {
             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">小时</p>
           </div>
         </div>
-        <div className="h-60">
-          <div className="flex items-end justify-between gap-3 h-full">
+        <div className="h-60 flex gap-3">
+          {/* Y-axis */}
+          <div className="flex flex-col justify-between items-end h-[calc(100%-1.5rem)] text-[10px] text-slate-400 font-bold">
+            <span>5h</span>
+            <span>4h</span>
+            <span>3h</span>
+            <span>2h</span>
+            <span>1h</span>
+          </div>
+          <div className="flex items-end justify-between gap-3 h-full flex-1">
             {/* 生成周一至周日的数据 */}
             {[1, 2, 3, 4, 5, 6, 0].map((dayIndex, idx) => {
               const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
@@ -283,10 +291,10 @@ const Dashboard: React.FC = () => {
                 return itemDate.toDateString() === targetDate.toDateString();
               });
               
-              const maxHours = 12;
+              const maxHours = 5;
               const study_hours = dayData?.study_hours || 0;
               
-              const studyHeight = (study_hours / maxHours) * 100;
+              const studyHeight = Math.min((study_hours / maxHours) * 100, 100);
               
               // 生成悬停提示内容
               let tooltipContent = '';

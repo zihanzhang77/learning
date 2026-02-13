@@ -114,8 +114,8 @@ router.post('/avatar', upload.single('avatar'), async (req, res) => {
       return res.status(400).json({ error: '请提供头像文件和用户ID' });
     }
 
-    // 构建头像URL（使用完整的URL）
-    const avatarUrl = `http://localhost:3001/uploads/${file.filename}`;
+    // 构建头像URL（使用相对URL，由前端代理处理）
+    const avatarUrl = `/uploads/${file.filename}`;
 
     // 更新用户的头像URL
     const { data: user, error } = await supabase

@@ -33,8 +33,23 @@ export const userApi = {
     return data;
   },
   uploadAvatar: async (userId: string, formData: FormData) => {
-    // 模拟上传成功
-    return { url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + userId, message: '头像上传成功' };
+    try {
+      // 使用后端API上传头像
+      const response = await fetch(`${API_URL}/user/avatar`, {
+        method: 'POST',
+        body: formData, // FormData会自动设置Content-Type
+      });
+
+      if (!response.ok) {
+        throw new Error('上传失败');
+      }
+
+      const data = await response.json();
+      return { status: 'ok', ...data };
+    } catch (error) {
+      console.error('上传头像错误:', error);
+      return { error: '上传失败' };
+    }
   }
 };
 
