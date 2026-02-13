@@ -565,7 +565,7 @@ export const aiApi = {
                 { role: 'system', content: mode === 'encouragement' ? '你是一个活泼俏皮的朋友，说话大白话，会用口语化的表达鼓励人，不要太文艺。' : '你是一个专业的学习规划师。' },
                 { role: 'user', content: prompt }
              ],
-             temperature: 0.7
+             temperature: 0.1
            })
         });
 
@@ -599,7 +599,7 @@ export const aiApi = {
                      { role: 'system', content: mode === 'encouragement' ? '你是一个活泼俏皮的朋友，说话大白话，会用口语化的表达鼓励人，不要太文艺。' : '你是一个专业的学习规划师。' },
                      { role: 'user', content: prompt }
                   ],
-                  temperature: 0.7
+                  temperature: 0.1
                 })
              });
              if (directResponse.ok) {

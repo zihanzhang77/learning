@@ -84,11 +84,6 @@ export const AiProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       1. **1次模拟/复盘**
       2. **整理错题/重点**
       `;
-      
-      **模板使用说明**：
-      - 表格中的换行请使用 <br> 标签。
-      - 请根据具体学习内容灵活调整。
-      `;
 
       // 这里的 Promise 在组件卸载后仍然会继续执行，因为 Context 依然存在
       const data = await aiApi.deepseek(prompt, 'plan');
