@@ -111,7 +111,17 @@ const Stats: React.FC = () => {
       setAiOutput(data.answer);
     } catch (error: any) {
       console.error('AI 请求失败:', error);
-      setAiError(error.message || '生成计划失败，请重试');
+      // 获取更详细的错误信息
+      let errorMessage = error.message || '生成计划失败，请重试';
+      if (error.response) {
+        try {
+          const errorData = await error.response.json();
+          errorMessage = `${errorMessage} (详情: ${JSON.stringify(errorData)})`;
+        } catch (e) {
+          errorMessage = `${errorMessage} (状态码: ${error.response.status})`;
+        }
+      }
+      setAiError(errorMessage);
     } finally {
       setAiLoading(false);
     }

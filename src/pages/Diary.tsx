@@ -112,9 +112,9 @@ const Diary: React.FC = () => {
       const prompt = `请根据我最近3天的日记内容，给我一段温暖、治愈的鼓励。要求：20-50字左右，像朋友一样说话。\n\n${recentDiaries}`;
       const response = await aiApi.deepseek(prompt);
       setAiEncouragement(response.answer);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setAiEncouragement("AI 暂时休息了，不过你要相信自己很棒！");
+      setAiEncouragement(`AI 暂时休息了 (错误: ${error.message || '未知错误'})`);
     } finally {
       setIsAnalyzing(false);
     }

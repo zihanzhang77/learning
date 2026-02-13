@@ -537,7 +537,16 @@ export const aiApi = {
       });
 
       if (!response.ok) {
-        throw new Error(`AI 请求失败: ${response.status}`);
+        let errorMessage = `AI 请求失败: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          // Ignore JSON parse error
+        }
+        throw new Error(errorMessage);
       }
 
       return await response.json();
