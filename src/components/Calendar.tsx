@@ -4,12 +4,20 @@ import { attendanceApi } from '../services/api';
 interface CalendarProps {
   userId: string | undefined;
   streak: number;
+  selectedDate?: string;
 }
 
-const Calendar: React.FC<CalendarProps> = ({ userId, streak }) => {
+const Calendar: React.FC<CalendarProps> = ({ userId, streak, selectedDate }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [attendanceData, setAttendanceData] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+
+  // 当 selectedDate 改变时，更新当前显示的月份
+  useEffect(() => {
+    if (selectedDate) {
+      setCurrentMonth(new Date(selectedDate));
+    }
+  }, [selectedDate]);
 
   // 生成当前月份的日历数据
   const generateCalendarDays = () => {

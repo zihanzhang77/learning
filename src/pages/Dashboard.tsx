@@ -206,7 +206,7 @@ const Dashboard: React.FC = () => {
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-sm font-bold text-slate-900">签到日历</h3>
         </div>
-        <Calendar userId={user?.id} streak={streak} />
+        <Calendar userId={user?.id} streak={streak} selectedDate={selectedDate} />
       </div>
 
       {/* 时间消耗输入部分 */}
