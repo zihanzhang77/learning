@@ -142,6 +142,24 @@ const Profile: React.FC = () => {
     }
   };
 
+  const badge = React.useMemo(() => {
+    if (streak >= 100) return { name: '王者', color: 'text-yellow-500', icon: 'military_tech', bg: 'bg-yellow-50' };
+    if (streak >= 51) return { name: '钻石', color: 'text-cyan-400', icon: 'diamond', bg: 'bg-cyan-50' };
+    if (streak >= 22) return { name: '黄金', color: 'text-amber-400', icon: 'workspace_premium', bg: 'bg-amber-50' };
+    if (streak >= 8) return { name: '白银', color: 'text-slate-400', icon: 'military_tech', bg: 'bg-slate-50' };
+    if (streak >= 4) return { name: '青铜', color: 'text-orange-700', icon: 'military_tech', bg: 'bg-orange-50' };
+    return { name: '废铁', color: 'text-slate-600', icon: 'hardware', bg: 'bg-slate-100' };
+  }, [streak]);
+
+  const nextLevelInfo = React.useMemo(() => {
+    if (streak >= 100) return null; // 已经是最高等级
+    if (streak >= 51) return { next: '王者', daysNeeded: 100 - streak };
+    if (streak >= 22) return { next: '钻石', daysNeeded: 51 - streak };
+    if (streak >= 8) return { next: '黄金', daysNeeded: 22 - streak };
+    if (streak >= 4) return { next: '白银', daysNeeded: 8 - streak };
+    return { next: '青铜', daysNeeded: 4 - streak };
+  }, [streak]);
+
   return (
     <div className="bg-white min-h-full">
       <header className="sticky top-0 z-50 flex items-center bg-white/90 backdrop-blur-xl px-4 h-14 justify-between border-b border-slate-100">
@@ -167,13 +185,26 @@ const Profile: React.FC = () => {
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
           </div>
-          <h2 className="text-2xl font-semibold tracking-tight">{user?.name || '用户'}</h2>
+          <h2 className="text-2xl font-semibold tracking-tight mb-2">{user?.name || '用户'}</h2>
+          
+          {/* 徽章展示 */}
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${badge.bg}`}>
+            <span className={`material-symbols-outlined text-[18px] ${badge.color}`}>{badge.icon}</span>
+            <span className={`text-xs font-bold ${badge.color}`}>{badge.name}</span>
+          </div>
+          
+          {/* 晋升提示 */}
+          {nextLevelInfo && (
+            <p className="text-[10px] text-slate-400 mt-2 font-medium">
+              再坚持 {nextLevelInfo.daysNeeded} 天升级为{nextLevelInfo.next}
+            </p>
+          )}
         </section>
 
         <section className="px-6 py-2 flex justify-around mb-4">
           <StatBox value={totalHours.toFixed(1)} label="累计学习时长" />
           <div className="w-[1px] h-8 bg-slate-100 self-center"></div>
-          <StatBox value={streak.toString()} label="累计学习天数" />
+          <StatBox value={streak.toString()} label="坚持天数" />
         </section>
 
         <section className="px-6 mb-8">
@@ -181,14 +212,16 @@ const Profile: React.FC = () => {
             onClick={handleModifyGoal}
             className="bg-slate-50 rounded-2xl p-5 active:scale-[0.98] transition-transform cursor-pointer"
           >
-            <GoalProgress 
-              icon="flag" 
-              label="每日目标" 
-              current={Math.round(goalProgress.current)} 
-              target={Math.round(goalProgress.target)} 
-              unit="分钟" 
-              progress={`${goalProgress.percentage}%`} 
-            />
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-slate-400 text-xl">flag</span>
+                <span className="text-[15px] font-bold text-slate-700">每日目标</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-[15px] font-black text-slate-900">{Math.round(goalProgress.target)}</span>
+                <span className="text-[13px] text-slate-400 font-bold">分钟</span>
+              </div>
+            </div>
           </div>
         </section>
 

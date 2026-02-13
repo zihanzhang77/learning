@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
 // 用户API
 export const userApi = {
   getUser: async (userId: string) => {
@@ -115,6 +117,93 @@ export const authApi = {
 };
 
 // 计时器API
+export const diaryApi = {
+  // 获取日记列表
+  getDiaries: async (userId: string) => {
+    try {
+      // 优先从后端 API 获取，如果失败则尝试直接从 Supabase 获取（容错）
+      try {
+        const response = await fetch(`${API_URL}/diary/${userId}`);
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (e) {
+        console.warn('API获取日记失败，尝试Supabase直连', e);
+      }
+      
+      const { data, error } = await supabase
+        .from('diaries')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
+      
+      if (error) {
+         if (error.code === '42P01') return []; // 表不存在
+         throw error;
+      }
+      return data;
+    } catch (error) {
+      console.error('获取日记失败:', error);
+      return [];
+    }
+  },
+  
+  // 获取单篇日记
+  getDiaryByDate: async (userId: string, date: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('diaries')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .single();
+        
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    } catch (error) {
+      console.error('获取单篇日记失败:', error);
+      return null;
+    }
+  },
+
+  // 保存日记
+  saveDiary: async (userId: string, date: string, title: string, content: string) => {
+    try {
+      // 检查是否存在
+      const { data: existing } = await supabase
+        .from('diaries')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .single();
+
+      let result;
+      if (existing) {
+        const { data, error } = await supabase
+          .from('diaries')
+          .update({ title, content, updated_at: new Date() })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        result = data;
+      } else {
+        const { data, error } = await supabase
+          .from('diaries')
+          .insert([{ user_id: userId, date, title, content }])
+          .select()
+          .single();
+        if (error) throw error;
+        result = data;
+      }
+      return result;
+    } catch (error) {
+      console.error('保存日记失败:', error);
+      throw error;
+    }
+  }
+};
+
 export const timerApi = {
   startTimer: async (userId: string) => {
     const { data, error } = await supabase
@@ -400,14 +489,27 @@ export const timeConsumptionApi = {
   },
 };
 
-// AI API (Mock)
+// AI API
 export const aiApi = {
-  deepseek: async (prompt: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return {
-      thought: `分析用户问题: ${prompt}`,
-      answer: `这是对问题"${prompt}"的回答。AI功能目前仅作演示。`
-    };
+  deepseek: async (prompt: string, mode: 'encouragement' | 'plan' = 'encouragement') => {
+    try {
+      const response = await fetch(`${API_URL}/ai/deepseek`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt, mode }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI 请求失败: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('AI API Error:', error);
+      throw error;
+    }
   },
 };
 

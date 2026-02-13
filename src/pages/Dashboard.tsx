@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { goalApi, statsApi, timerApi, timeConsumptionApi } from '../services/api';
+import { goalApi, statsApi, timerApi, timeConsumptionApi, attendanceApi } from '../services/api';
 import Calendar from '../components/Calendar';
 
 const Dashboard: React.FC = () => {
@@ -50,10 +50,17 @@ const Dashboard: React.FC = () => {
       // 获取累计统计
       const allStats = await statsApi.getStats(userId, 'all');
       
-      // 获取本月统计
-      const monthStats = await statsApi.getStats(userId, 'month');
-      // 设置本月学习天数
-      setStreak(monthStats.study_days_count || 0);
+      // 获取本月学习天数（基于签到数据）
+      const attendanceList = await attendanceApi.getAttendance(userId);
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      // 计算本月签到天数
+      const monthStudyDays = attendanceList.filter((item: any) => {
+        const d = new Date(item.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      }).length;
+      
+      setStreak(monthStudyDays || 0);
       
       // 获取选定日期的时间消耗数据
       const selectedDateData = await timeConsumptionApi.getTimeConsumption(userId, selectedDate);
@@ -81,9 +88,9 @@ const Dashboard: React.FC = () => {
       
       // 设置时间消耗数据
       setTimeConsumption({
-        work: selectedDateData.work_hours || 0,
-        game: selectedDateData.game_hours || 0,
-        tiktok: selectedDateData.tiktok_hours || 0,
+        work: 0,
+        game: 0,
+        tiktok: 0,
         study: selectedDateData.study_hours || 0
       });
       
@@ -154,9 +161,9 @@ const Dashboard: React.FC = () => {
       await timeConsumptionApi.saveTimeConsumption(
         userId,
         selectedDate,
-        timeConsumption.work,
-        timeConsumption.game,
-        timeConsumption.tiktok,
+        0, // work
+        0, // game
+        0, // tiktok
         timeConsumption.study
       );
       
@@ -202,27 +209,11 @@ const Dashboard: React.FC = () => {
         <Calendar userId={user?.id} streak={streak} />
       </div>
 
-      <div className="bg-white rounded-[2rem] p-6 shadow-soft border border-slate-50 mb-10">
-        <h3 className="font-bold text-slate-900 mb-6">今日数据概览</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <ProgressCard
-            value={Math.round((totalMinutes / 60) * 10) / 10} // 将分钟转回小时显示，保留一位小数
-            unit="累计小时"
-            label="累计学习时长"
-          />
-          <ProgressCard
-            value={todayProgress}
-            unit="%"
-            label="今日目标完成"
-          />
-        </div>
-      </div>
-
       {/* 时间消耗输入部分 */}
       <div className="bg-white rounded-[2rem] p-6 shadow-soft border border-slate-50 mb-10">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h4 className="font-bold text-slate-900">今日时间消耗</h4>
+            <h4 className="font-bold text-slate-900">今日学习时长</h4>
             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">小时</p>
           </div>
           <div className="flex items-center gap-4">
@@ -241,43 +232,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-2">上班时间</label>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                max="24"
-                value={timeConsumption.work}
-                onChange={(e) => setTimeConsumption({ ...timeConsumption, work: parseFloat(e.target.value) || 0 })}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-2">游戏时间</label>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                max="24"
-                value={timeConsumption.game}
-                onChange={(e) => setTimeConsumption({ ...timeConsumption, game: parseFloat(e.target.value) || 0 })}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-2">抖音时间</label>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                max="24"
-                value={timeConsumption.tiktok}
-                onChange={(e) => setTimeConsumption({ ...timeConsumption, tiktok: parseFloat(e.target.value) || 0 })}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-2">学习时间</label>
               <input
@@ -328,50 +283,29 @@ const Dashboard: React.FC = () => {
                 return itemDate.toDateString() === targetDate.toDateString();
               });
               
-              const maxHours = 24;
-              const work_hours = dayData?.work_hours || 0;
-              const game_hours = dayData?.game_hours || 0;
-              const tiktok_hours = dayData?.tiktok_hours || 0;
+              const maxHours = 12;
               const study_hours = dayData?.study_hours || 0;
               
-              const workHeight = (work_hours / maxHours) * 100;
-              const gameHeight = (game_hours / maxHours) * 100;
-              const tiktokHeight = (tiktok_hours / maxHours) * 100;
               const studyHeight = (study_hours / maxHours) * 100;
               
               // 生成悬停提示内容
               let tooltipContent = '';
               if (dayData) {
-                tooltipContent = `上班: ${work_hours}小时\n游戏: ${game_hours}小时\n抖音: ${tiktok_hours}小时\n学习: ${study_hours}小时`;
+                tooltipContent = `学习时长: ${study_hours}小时`;
               } else {
                 tooltipContent = '无数据';
               }
               
               // 检查是否有数据
-              const hasData = work_hours > 0 || game_hours > 0 || tiktok_hours > 0 || study_hours > 0;
+              const hasData = study_hours > 0;
               
               return (
                 <div key={idx} className="flex flex-col items-center flex-1 gap-2 h-full justify-end">
                   <div className="w-4 flex flex-col justify-end items-center h-full gap-1" title={tooltipContent}>
                     <div 
-                      className={`w-full rounded-t-full ${hasData ? 'bg-blue-500' : 'bg-slate-300'}`} 
-                      style={{ height: hasData ? `${workHeight}%` : '2%' }}
-                      title={hasData ? `上班时间: ${work_hours}小时` : '无数据'}
-                    ></div>
-                    <div 
-                      className={`w-full ${hasData ? 'bg-green-500' : 'bg-slate-300'}`} 
-                      style={{ height: hasData ? `${gameHeight}%` : '2%' }}
-                      title={hasData ? `游戏时间: ${game_hours}小时` : '无数据'}
-                    ></div>
-                    <div 
-                      className={`w-full ${hasData ? 'bg-red-500' : 'bg-slate-300'}`} 
-                      style={{ height: hasData ? `${tiktokHeight}%` : '2%' }}
-                      title={hasData ? `抖音时间: ${tiktok_hours}小时` : '无数据'}
-                    ></div>
-                    <div 
-                      className={`w-full rounded-b-full ${hasData ? 'bg-purple-500' : 'bg-slate-300'}`} 
+                      className={`w-full rounded-full ${hasData ? 'bg-purple-500' : 'bg-slate-300'}`} 
                       style={{ height: hasData ? `${studyHeight}%` : '2%' }}
-                      title={hasData ? `学习时间: ${study_hours}小时` : '无数据'}
+                      title={hasData ? `学习时长: ${study_hours}小时` : '无数据'}
                     ></div>
                   </div>
                   <span className={`text-[10px] font-black ${isToday ? 'text-slate-900' : 'text-slate-300'}`}>{dayName}</span>
@@ -382,20 +316,8 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="flex justify-center gap-6 mt-6">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span className="text-xs font-medium text-slate-600">上班</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span className="text-xs font-medium text-slate-600">游戏</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            <span className="text-xs font-medium text-slate-600">抖音</span>
-          </div>
-          <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-            <span className="text-xs font-medium text-slate-600">学习</span>
+            <span className="text-xs font-medium text-slate-600">学习时长</span>
           </div>
         </div>
       </div>

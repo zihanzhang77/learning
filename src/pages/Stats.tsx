@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
-import { statsApi, timerApi, timeConsumptionApi } from '../services/api';
+import { statsApi, timerApi, timeConsumptionApi, aiApi } from '../services/api';
 import Calendar from '../components/Calendar';
 
 const Stats: React.FC = () => {
@@ -94,7 +94,29 @@ const Stats: React.FC = () => {
     }
   };
 
-  const currentData = statsData || { total: "0", avg: "0", trend: "0h" };
+  const [selectedTopic, setSelectedTopic] = useState('雅思');
+  const [aiOutput, setAiOutput] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const handleGeneratePlan = async () => {
+    if (!selectedTopic) return;
+    
+    setAiLoading(true);
+    setAiError(null);
+    setAiOutput(null);
+    
+    try {
+      const data = await aiApi.deepseek(selectedTopic, 'plan');
+      setAiOutput(data.answer);
+    } catch (error: any) {
+      console.error('AI 请求失败:', error);
+      setAiError(error.message || '生成计划失败，请重试');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col min-h-full">
@@ -112,45 +134,66 @@ const Stats: React.FC = () => {
         {/* 大模型板块 */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 mb-6 h-[80vh] flex flex-col">
           {/* 中间内容区域 */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col p-4 overflow-hidden">
             {/* AI 输出结果 */}
-            <div id="aiResponse" className="mb-4 flex-1 overflow-y-auto flex items-center justify-center">
-              <p className="text-slate-400">需要我帮你制定学习计划吗</p>
+            <div id="aiResponse" className="flex-1 overflow-y-auto custom-scrollbar flex items-center justify-center">
+              {!aiOutput && !aiLoading && !aiError && (
+                <div className="text-center">
+                  <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">school</span>
+                  <p className="text-slate-400">选择一个目标，为你生成专属学习计划</p>
+                </div>
+              )}
+              
+              {aiLoading && (
+                <div className="text-center">
+                  <span className="material-symbols-outlined text-4xl text-blue-500 animate-spin mb-2">autorenew</span>
+                  <p className="text-slate-400">AI 正在规划中...</p>
+                </div>
+              )}
+              
+              {aiError && (
+                <div className="text-center">
+                  <span className="material-symbols-outlined text-4xl text-red-400 mb-2">error</span>
+                  <p className="text-red-500">{aiError}</p>
+                </div>
+              )}
+              
+              {aiOutput && (
+                <div className="w-full bg-blue-50/50 rounded-xl p-6 text-left h-full overflow-y-auto">
+                  <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {aiOutput}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* 底部输入区域 */}
-          <div className="mt-4">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="制定学习计划"
-                className="flex-1 p-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                id="promptInput"
-              />
+          <div className="p-4 border-t border-slate-100">
+            <div className="flex gap-3 items-center">
+              <div className="relative flex-1">
+                <select
+                  value={selectedTopic}
+                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  disabled={aiLoading}
+                  className="w-full appearance-none p-3 pl-4 pr-10 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50"
+                >
+                  <option value="雅思">雅思 (IELTS)</option>
+                  <option value="钢琴">钢琴 (Piano)</option>
+                  <option value="绘画">绘画 (Painting)</option>
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                  <span className="material-symbols-outlined text-xl">expand_more</span>
+                </div>
+              </div>
+              
               <button
-                onClick={async () => {
-                  const prompt = document.getElementById('promptInput') as HTMLInputElement;
-                  if (!prompt?.value) return;
-                  
-                  const responseDiv = document.getElementById('aiResponse') as HTMLDivElement;
-                  responseDiv.innerHTML = '<p className="text-slate-400">AI 思考中...</p>';
-                  
-                  try {
-                    const data = await aiApi.deepseek(prompt.value);
-                    responseDiv.innerHTML = `
-                      <div className="p-3 bg-blue-50 rounded-lg">
-                        <p className="text-sm text-slate-600">${data.answer}</p>
-                      </div>
-                    `;
-                  } catch (error) {
-                    console.error('AI 请求失败:', error);
-                    responseDiv.innerHTML = '<p className="text-red-500">AI 回答失败，请重试</p>';
-                  }
-                }}
-                className="w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors flex items-center justify-center"
+                onClick={handleGeneratePlan}
+                disabled={aiLoading || !selectedTopic}
+                className="px-6 h-[46px] bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-blue-500/20"
               >
-                <span className="material-symbols-outlined text-sm">send</span>
+                <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                生成计划
               </button>
             </div>
           </div>

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { HashRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './src/context/UserContext';
 import Dashboard from './src/pages/Dashboard';
-import Timer from './src/pages/Timer';
+import Diary from './src/pages/Diary';
 import Stats from './src/pages/Stats';
 import Profile from './src/pages/Profile';
 import Login from './src/pages/Login';
@@ -37,7 +37,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/80 backdrop-blur-2xl border-t border-slate-100/60 pb-8 pt-3 px-10 flex justify-between items-center z-50">
         <NavItem to="/" icon="home" label="今日" />
-        <NavItem to="/timer" icon="timer" label="计时器" />
+        <NavItem to="/diary" icon="book" label="日记" />
         <NavItem to="/stats" icon="smart_toy" label="大模型" />
         <NavItem to="/profile" icon="person" label="我的" />
       </nav>
@@ -62,11 +62,11 @@ const AppContent: React.FC = () => {
           }
         />
         <Route 
-          path="/timer" 
+          path="/diary" 
           element={
             <PrivateRoute>
               <AppLayout>
-                <Timer />
+                <Diary />
               </AppLayout>
             </PrivateRoute>
           }

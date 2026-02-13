@@ -6,6 +6,7 @@ import timerRoutes from './routes/timer.js';
 import statsRoutes from './routes/stats.js';
 import goalRoutes from './routes/goal.js';
 import authRoutes from './routes/auth.js';
+import diaryRoutes from './routes/diary.js';
 import timeConsumptionRoutes from './routes/timeConsumption.js';
 import attendanceRoutes from './routes/attendance.js';
 import aiRoutes from './routes/ai.js';
@@ -111,8 +112,8 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // 路由
 app.use('/api/auth', authRoutes);
+app.use('/api/diary', diaryRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/timer', timerRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/goal', goalRoutes);
 app.use('/api/time-consumption', timeConsumptionRoutes);
