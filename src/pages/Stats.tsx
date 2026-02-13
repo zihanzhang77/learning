@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
-import { statsApi, timerApi, timeConsumptionApi, aiApi } from '../services/api';
+import { useAi } from '../context/AiContext';
+import { statsApi, timerApi, timeConsumptionApi } from '../services/api';
 import Calendar from '../components/Calendar';
 
 const Stats: React.FC = () => {
@@ -13,6 +14,9 @@ const Stats: React.FC = () => {
   // 时间消耗相关状态
   const [weeklyTimeData, setWeeklyTimeData] = useState<any[]>([]);
   const { user } = useUser();
+  
+  // 使用全局 AI Context
+  const { selectedTopic, setSelectedTopic, aiOutput, aiLoading, aiError, generatePlan } = useAi();
 
   useEffect(() => {
     if (user) {
@@ -94,37 +98,8 @@ const Stats: React.FC = () => {
     }
   };
 
-  const [selectedTopic, setSelectedTopic] = useState('雅思');
-  const [aiOutput, setAiOutput] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-
   const handleGeneratePlan = async () => {
-    if (!selectedTopic) return;
-    
-    setAiLoading(true);
-    setAiError(null);
-    setAiOutput(null);
-    
-    try {
-      const data = await aiApi.deepseek(selectedTopic, 'plan');
-      setAiOutput(data.answer);
-    } catch (error: any) {
-      console.error('AI 请求失败:', error);
-      // 获取更详细的错误信息
-      let errorMessage = error.message || '生成计划失败，请重试';
-      if (error.response) {
-        try {
-          const errorData = await error.response.json();
-          errorMessage = `${errorMessage} (详情: ${JSON.stringify(errorData)})`;
-        } catch (e) {
-          errorMessage = `${errorMessage} (状态码: ${error.response.status})`;
-        }
-      }
-      setAiError(errorMessage);
-    } finally {
-      setAiLoading(false);
-    }
+    await generatePlan();
   };
 
 
@@ -188,9 +163,13 @@ const Stats: React.FC = () => {
                   disabled={aiLoading}
                   className="w-full appearance-none p-3 pl-4 pr-10 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50"
                 >
-                  <option value="雅思">雅思 (IELTS)</option>
-                  <option value="钢琴">钢琴 (Piano)</option>
-                  <option value="绘画">绘画 (Painting)</option>
+                  <option value="雅思/托福">雅思/托福</option>
+                  <option value="视频剪辑">视频剪辑</option>
+                  <option value="自媒体运营">自媒体运营</option>
+                  <option value="电商运营">电商运营</option>
+                  <option value="演讲与口才表达">演讲与口才表达</option>
+                  <option value="理财与基金入门">理财与基金入门</option>
+                  <option value="AI 工具使用">AI 工具使用</option>
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
                   <span className="material-symbols-outlined text-xl">expand_more</span>

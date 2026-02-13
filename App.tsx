@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { HashRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './src/context/UserContext';
+import { AiProvider } from './src/context/AiContext';
 import Dashboard from './src/pages/Dashboard';
 import Diary from './src/pages/Diary';
 import Stats from './src/pages/Stats';
@@ -99,7 +100,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <UserProvider>
-      <AppContent />
+      <AiProvider>
+        <AppContent />
+      </AiProvider>
     </UserProvider>
   );
 };

@@ -253,7 +253,7 @@ const Dashboard: React.FC = () => {
       <div className="bg-white rounded-[2rem] p-6 shadow-soft border border-slate-50 mb-10">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h4 className="font-bold text-slate-900">每周时间消耗</h4>
+            <h4 className="font-bold text-slate-900">本周学习时长</h4>
             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">小时</p>
           </div>
         </div>
