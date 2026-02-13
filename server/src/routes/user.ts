@@ -85,11 +85,24 @@ router.put('/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const updates = req.body;
+    
+    // 过滤允许更新的字段
+    const allowedUpdates = [
+      'name', 'email', 'avatar_url', 'level', 
+      'learning_topic', 'target_goal', 'current_level'
+    ];
+    
+    const filteredUpdates = Object.keys(updates)
+      .filter(key => allowedUpdates.includes(key))
+      .reduce((obj, key) => {
+        obj[key] = updates[key];
+        return obj;
+      }, {} as any);
 
     const { data, error } = await supabase
       .from('users')
       .update({
-        ...updates,
+        ...filteredUpdates,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId)
@@ -97,6 +110,12 @@ router.put('/:userId', async (req, res) => {
       .single();
 
     if (error) throw error;
+    
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
     res.json(data);
   } catch (error: any) {

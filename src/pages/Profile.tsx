@@ -16,6 +16,13 @@ const Profile: React.FC = () => {
   const [passwordError, setPasswordError] = useState('');
   const navigate = useNavigate();
 
+  const [learningProfile, setLearningProfile] = useState({
+    topic: '',
+    target: '',
+    level: ''
+  });
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+
   useEffect(() => {
     if (user) {
       loadProfileData();
@@ -26,6 +33,14 @@ const Profile: React.FC = () => {
     if (!user) return;
     
     try {
+      // 获取最新用户信息（包含学习偏好）
+      const userData = await userApi.getUser(user.id);
+      setLearningProfile({
+        topic: userData.learning_topic || '',
+        target: userData.target_goal || '',
+        level: userData.current_level || ''
+      });
+
       const [allStats, allTimeConsumption, totalDaysData, goal, todayStats] = await Promise.all([
         statsApi.getStats(user.id, 'all'),
         timeConsumptionApi.getTimeConsumptionRange(user.id, '2000-01-01', '2099-12-31'),
@@ -70,6 +85,22 @@ const Profile: React.FC = () => {
         console.error('更新目标失败:', error);
         alert('更新目标失败，请重试');
       }
+    }
+  };
+
+  const handleSaveLearningProfile = async () => {
+    if (!user) return;
+    try {
+      await userApi.updateUser(user.id, {
+        learning_topic: learningProfile.topic,
+        target_goal: learningProfile.target,
+        current_level: learningProfile.level
+      });
+      setIsEditingProfile(false);
+      alert('学习档案已更新');
+    } catch (error) {
+      console.error('更新学习档案失败:', error);
+      alert('更新失败，请重试');
     }
   };
 
@@ -209,6 +240,104 @@ const Profile: React.FC = () => {
 
         <section className="px-6 mb-8">
           
+        </section>
+
+        {/* 学习档案 */}
+        <section className="border-t border-slate-50 mb-8">
+          <div className="flex items-center justify-between px-6 py-4">
+            <h3 className="text-[17px] font-semibold">学习档案</h3>
+            {!isEditingProfile ? (
+              <button 
+                onClick={() => setIsEditingProfile(true)}
+                className="text-sm text-blue-500 font-medium"
+              >
+                编辑
+              </button>
+            ) : (
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setIsEditingProfile(false)}
+                  className="text-sm text-slate-400 font-medium"
+                >
+                  取消
+                </button>
+                <button 
+                  onClick={handleSaveLearningProfile}
+                  className="text-sm text-blue-500 font-medium"
+                >
+                  保存
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <div className="px-6 space-y-4">
+            {/* 学习内容 */}
+            <div className="bg-slate-50 p-4 rounded-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-slate-400 text-lg">menu_book</span>
+                <span className="text-xs font-bold text-slate-500">正在学习</span>
+              </div>
+              {isEditingProfile ? (
+                <select
+                  value={learningProfile.topic}
+                  onChange={(e) => setLearningProfile({...learningProfile, topic: e.target.value})}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">请选择</option>
+                  <option value="雅思/托福">雅思/托福</option>
+                  <option value="视频剪辑">视频剪辑</option>
+                  <option value="自媒体运营">自媒体运营</option>
+                  <option value="电商运营">电商运营</option>
+                  <option value="演讲与口才表达">演讲与口才表达</option>
+                  <option value="理财与基金入门">理财与基金入门</option>
+                  <option value="AI 工具使用">AI 工具使用</option>
+                </select>
+              ) : (
+                <p className="text-slate-900 font-medium">{learningProfile.topic || '暂未设置'}</p>
+              )}
+            </div>
+
+            <div className="flex gap-4">
+              {/* 目标 */}
+              <div className="flex-1 bg-slate-50 p-4 rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="material-symbols-outlined text-slate-400 text-lg">flag</span>
+                  <span className="text-xs font-bold text-slate-500">目标</span>
+                </div>
+                {isEditingProfile ? (
+                  <input
+                    type="text"
+                    value={learningProfile.target}
+                    onChange={(e) => setLearningProfile({...learningProfile, target: e.target.value})}
+                    placeholder="如：考到7分"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                ) : (
+                  <p className="text-slate-900 font-medium">{learningProfile.target || '暂未设置'}</p>
+                )}
+              </div>
+
+              {/* 当前水平 */}
+              <div className="flex-1 bg-slate-50 p-4 rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="material-symbols-outlined text-slate-400 text-lg">trending_up</span>
+                  <span className="text-xs font-bold text-slate-500">当前水平</span>
+                </div>
+                {isEditingProfile ? (
+                  <input
+                    type="text"
+                    value={learningProfile.level}
+                    onChange={(e) => setLearningProfile({...learningProfile, level: e.target.value})}
+                    placeholder="如：零基础"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                ) : (
+                  <p className="text-slate-900 font-medium">{learningProfile.level || '暂未设置'}</p>
+                )}
+              </div>
+            </div>
+          </div>
         </section>
 
         <section className="mt-8 border-t border-slate-50">

@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useUser } from '../context/UserContext';
 import { useAi } from '../context/AiContext';
-import { statsApi, timerApi, timeConsumptionApi } from '../services/api';
+import { statsApi, timerApi, timeConsumptionApi, userApi } from '../services/api';
 import Calendar from '../components/Calendar';
 
 const Stats: React.FC = () => {
@@ -13,15 +15,49 @@ const Stats: React.FC = () => {
   const [loading, setLoading] = useState(true);
   // 时间消耗相关状态
   const [weeklyTimeData, setWeeklyTimeData] = useState<any[]>([]);
-  const { user } = useUser();
+  const { user, refreshUser } = useUser();
   
   // 使用全局 AI Context
   const { 
     selectedTopic, setSelectedTopic, 
     targetGoal, setTargetGoal,
     currentLevel, setCurrentLevel,
-    aiOutput, aiLoading, aiError, generatePlan 
+    aiOutput, aiLoading, aiError, generatePlan,
+    setAiOutput // 假设 Context 暴露了这个方法，如果没有，需要去添加
   } = useAi();
+
+  const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
+  const [isTargetDropdownOpen, setIsTargetDropdownOpen] = useState(false);
+  const [isLevelDropdownOpen, setIsLevelDropdownOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const targetDropdownRef = React.useRef<HTMLDivElement>(null);
+  const levelDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
+        setIsTopicDropdownOpen(false);
+      }
+      if (targetDropdownRef.current && !targetDropdownRef.current.contains(target)) {
+        setIsTargetDropdownOpen(false);
+      }
+      if (levelDropdownRef.current && !levelDropdownRef.current.contains(target)) {
+        setIsLevelDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const levelOptions = ['没学过', '了解', '熟悉', '精通', '专家'];
+  const topicOptions = [
+    '雅思/托福', '视频剪辑', '自媒体运营', '电商运营',
+    '演讲与口才表达', '理财与基金入门', 'AI 工具使用'
+  ];
 
   useEffect(() => {
     if (user) {
@@ -104,9 +140,33 @@ const Stats: React.FC = () => {
   };
 
   const handleGeneratePlan = async () => {
+    // 1. 先保存用户学习偏好到 Supabase (优先保存，避免等待 AI 生成时用户退出导致数据丢失)
+    if (user) {
+      try {
+        await userApi.updateUser(user.id, {
+          learning_topic: selectedTopic,
+          target_goal: targetGoal,
+          current_level: currentLevel
+        });
+        console.log('用户学习偏好已保存');
+        // 立即刷新用户状态，确保"我的"页面能同步获取最新数据
+        await refreshUser();
+      } catch (error) {
+        console.error('保存用户学习偏好失败:', error);
+      }
+    }
+
+    // 2. 生成计划
     await generatePlan();
   };
 
+  const handleRegenerate = () => {
+    handleGeneratePlan();
+  };
+
+  const handleBack = () => {
+    setAiOutput(null);
+  };
 
   return (
     <div className="flex flex-col min-h-full">
@@ -124,104 +184,221 @@ const Stats: React.FC = () => {
         {/* 大模型板块 */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 mb-6 h-[80vh] flex flex-col">
           {/* 中间内容区域 */}
-          <div className="flex-1 flex flex-col p-4 overflow-hidden">
+          <div className="flex-1 flex flex-col p-4 overflow-hidden relative">
             {/* AI 输出结果 */}
-            <div id="aiResponse" className="flex-1 overflow-y-auto custom-scrollbar flex items-center justify-center">
+            <div id="aiResponse" className="flex-1 h-full flex flex-col">
               {!aiOutput && !aiLoading && !aiError && (
-                <div className="text-center">
+                <div className="flex-1 flex flex-col items-center justify-center">
                   <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">school</span>
                   <p className="text-slate-400">选择一个目标，为你生成专属学习计划</p>
                 </div>
               )}
               
               {aiLoading && (
-                <div className="text-center">
+                <div className="flex-1 flex flex-col items-center justify-center">
                   <span className="material-symbols-outlined text-4xl text-blue-500 animate-spin mb-2">autorenew</span>
                   <p className="text-slate-400">AI 正在规划中...</p>
+                  <p className="text-slate-300 text-xs mt-2">预计需要30秒...</p>
                 </div>
               )}
               
               {aiError && (
-                <div className="text-center">
+                <div className="flex-1 flex flex-col items-center justify-center">
                   <span className="material-symbols-outlined text-4xl text-red-400 mb-2">error</span>
                   <p className="text-red-500">{aiError}</p>
                 </div>
               )}
               
               {aiOutput && (
-                <div className="w-full bg-blue-50/50 rounded-xl p-6 text-left h-full overflow-y-auto">
-                  <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed whitespace-pre-wrap">
+                <div className="w-full bg-blue-50/50 rounded-xl p-6 text-left h-full overflow-y-auto custom-scrollbar">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    className="prose prose-sm max-w-none text-slate-700 leading-relaxed 
+                      prose-headings:font-bold prose-headings:text-slate-800 
+                      prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                      prose-strong:text-slate-900 prose-strong:font-black
+                      prose-table:border-collapse prose-table:w-full prose-table:my-4 prose-table:rounded-lg prose-table:overflow-hidden prose-table:shadow-sm
+                      prose-th:border prose-th:border-slate-200 prose-th:bg-white prose-th:p-3 prose-th:text-xs prose-th:font-bold prose-th:text-slate-700 prose-th:text-left
+                      prose-td:border prose-td:border-slate-200 prose-td:bg-white/50 prose-td:p-3 prose-td:text-xs prose-td:text-slate-600
+                      prose-li:my-0.5 prose-p:my-2"
+                  >
                     {aiOutput}
-                  </div>
+                  </ReactMarkdown>
                 </div>
               )}
             </div>
           </div>
 
-          {/* 底部输入区域 */}
+          {/* 底部操作区域 */}
           <div className="p-4 border-t border-slate-100">
-            <div className="flex flex-col gap-3">
-              {/* 第一步：选择学习内容 */}
-              <div className="relative w-full">
-                <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">学习内容</label>
-                <div className="relative">
-                  <select
-                    value={selectedTopic}
-                    onChange={(e) => setSelectedTopic(e.target.value)}
-                    disabled={aiLoading}
-                    className="w-full appearance-none p-3 pl-4 pr-10 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50"
-                  >
-                    <option value="雅思/托福">雅思/托福</option>
-                    <option value="视频剪辑">视频剪辑</option>
-                    <option value="自媒体运营">自媒体运营</option>
-                    <option value="电商运营">电商运营</option>
-                    <option value="演讲与口才表达">演讲与口才表达</option>
-                    <option value="理财与基金入门">理财与基金入门</option>
-                    <option value="AI 工具使用">AI 工具使用</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-                    <span className="material-symbols-outlined text-xl">expand_more</span>
+            {aiOutput ? (
+              // 生成结果后的操作按钮
+              <div className="flex gap-3">
+                <button
+                  onClick={handleBack}
+                  className="flex-1 h-[46px] bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">arrow_back</span>
+                  返回修改
+                </button>
+                <button
+                  onClick={handleRegenerate}
+                  className="flex-1 h-[46px] bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-all active:scale-95 shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">refresh</span>
+                  重新生成
+                </button>
+              </div>
+            ) : (
+              // 输入表单
+              <div className="flex flex-col gap-3">
+                {/* 第一步：选择学习内容 */}
+                <div className="relative w-full" ref={dropdownRef}>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">学习内容</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={selectedTopic}
+                      onChange={(e) => {
+                        setSelectedTopic(e.target.value);
+                        setIsTopicDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsTopicDropdownOpen(true)}
+                      placeholder="下拉看看大家都在学什么"
+                      disabled={aiLoading}
+                      className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"
+                    />
+                    <div 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer"
+                      onClick={() => !aiLoading && setIsTopicDropdownOpen(!isTopicDropdownOpen)}
+                    >
+                      <span className="material-symbols-outlined text-xl">
+                        {isTopicDropdownOpen ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </div>
+                    
+                    {/* 下拉选项 */}
+                    {isTopicDropdownOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                        {topicOptions.map((topic) => (
+                          <div
+                            key={topic}
+                            onClick={() => {
+                              setSelectedTopic(topic);
+                              setIsTopicDropdownOpen(false);
+                            }}
+                            className="px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer transition-colors"
+                          >
+                            {topic}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
 
-              <div className="flex gap-3">
-                {/* 第二步：达成目标 */}
-                <div className="flex-1">
-                  <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">达成目标</label>
-                  <input
-                    type="text"
-                    value={targetGoal}
-                    onChange={(e) => setTargetGoal(e.target.value)}
-                    disabled={aiLoading}
-                    placeholder="如：考到7分 / 独立接单"
-                    className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"
-                  />
-                </div>
+                <div className="flex gap-3">
+                  {/* 第二步：达成目标 */}
+                  <div className="flex-1" ref={targetDropdownRef}>
+                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">达成目标</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={targetGoal}
+                        onChange={(e) => {
+                          setTargetGoal(e.target.value);
+                          setIsTargetDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsTargetDropdownOpen(true)}
+                        placeholder="输入或选择"
+                        disabled={aiLoading}
+                        className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"
+                      />
+                      <div 
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer"
+                        onClick={() => !aiLoading && setIsTargetDropdownOpen(!isTargetDropdownOpen)}
+                      >
+                        <span className="material-symbols-outlined text-xl">
+                          {isTargetDropdownOpen ? 'expand_less' : 'expand_more'}
+                        </span>
+                      </div>
+                      
+                      {/* 下拉选项 */}
+                      {isTargetDropdownOpen && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-slate-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                          {levelOptions.map((option) => (
+                            <div
+                              key={option}
+                              onClick={() => {
+                                setTargetGoal(option);
+                                setIsTargetDropdownOpen(false);
+                              }}
+                              className="px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer transition-colors"
+                            >
+                              {option}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                {/* 第三步：当前水平 */}
-                <div className="flex-1">
-                  <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">当前水平</label>
-                  <input
-                    type="text"
-                    value={currentLevel}
-                    onChange={(e) => setCurrentLevel(e.target.value)}
-                    disabled={aiLoading}
-                    placeholder="如：四级450 / 零基础"
-                    className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"
-                  />
+                  {/* 第三步：当前水平 */}
+                  <div className="flex-1" ref={levelDropdownRef}>
+                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">当前水平</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={currentLevel}
+                        onChange={(e) => {
+                          setCurrentLevel(e.target.value);
+                          setIsLevelDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsLevelDropdownOpen(true)}
+                        placeholder="输入或选择"
+                        disabled={aiLoading}
+                        className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"
+                      />
+                      <div 
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer"
+                        onClick={() => !aiLoading && setIsLevelDropdownOpen(!isLevelDropdownOpen)}
+                      >
+                        <span className="material-symbols-outlined text-xl">
+                          {isLevelDropdownOpen ? 'expand_less' : 'expand_more'}
+                        </span>
+                      </div>
+                      
+                      {/* 下拉选项 */}
+                      {isLevelDropdownOpen && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-slate-100 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                          {levelOptions.map((option) => (
+                            <div
+                              key={option}
+                              onClick={() => {
+                                setCurrentLevel(option);
+                                setIsLevelDropdownOpen(false);
+                              }}
+                              className="px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer transition-colors"
+                            >
+                              {option}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
+                
+                <button
+                  onClick={handleGeneratePlan}
+                  disabled={aiLoading || !selectedTopic || !targetGoal || !currentLevel}
+                  className="w-full h-[46px] bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 mt-2"
+                >
+                  <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                  {aiLoading ? '生成计划中...' : '生成详细学习计划'}
+                </button>
               </div>
-              
-              <button
-                onClick={handleGeneratePlan}
-                disabled={aiLoading || !selectedTopic || !targetGoal || !currentLevel}
-                className="w-full h-[46px] bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 mt-2"
-              >
-                <span className="material-symbols-outlined text-lg">auto_awesome</span>
-                {aiLoading ? '生成计划中...' : '生成详细学习计划'}
-              </button>
-            </div>
+            )}
           </div>
         </div>
       </main>

@@ -8,6 +8,9 @@ interface User {
   phone_number?: string;
   avatar_url?: string;
   level?: number;
+  learning_topic?: string;
+  target_goal?: string;
+  current_level?: string;
 }
 
 interface UserContextType {
