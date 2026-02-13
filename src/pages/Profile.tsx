@@ -279,38 +279,31 @@ const Profile: React.FC = () => {
                 <span className="text-xs font-bold text-slate-500">正在学习</span>
               </div>
               {isEditingProfile ? (
-                <select
+                <input
+                  type="text"
                   value={learningProfile.topic}
                   onChange={(e) => setLearningProfile({...learningProfile, topic: e.target.value})}
+                  placeholder=""
                   className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">请选择</option>
-                  <option value="雅思/托福">雅思/托福</option>
-                  <option value="视频剪辑">视频剪辑</option>
-                  <option value="自媒体运营">自媒体运营</option>
-                  <option value="电商运营">电商运营</option>
-                  <option value="演讲与口才表达">演讲与口才表达</option>
-                  <option value="理财与基金入门">理财与基金入门</option>
-                  <option value="AI 工具使用">AI 工具使用</option>
-                </select>
+                />
               ) : (
                 <p className="text-slate-900 font-medium">{learningProfile.topic || '暂未设置'}</p>
               )}
             </div>
 
             <div className="flex gap-4">
-              {/* 目标 */}
+              {/* 学习目标 */}
               <div className="flex-1 bg-slate-50 p-4 rounded-xl">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="material-symbols-outlined text-slate-400 text-lg">flag</span>
-                  <span className="text-xs font-bold text-slate-500">目标</span>
+                  <span className="text-xs font-bold text-slate-500">学习目标</span>
                 </div>
                 {isEditingProfile ? (
                   <input
                     type="text"
                     value={learningProfile.target}
                     onChange={(e) => setLearningProfile({...learningProfile, target: e.target.value})}
-                    placeholder="如：考到7分"
+                    placeholder=""
                     className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 ) : (
@@ -329,7 +322,7 @@ const Profile: React.FC = () => {
                     type="text"
                     value={learningProfile.level}
                     onChange={(e) => setLearningProfile({...learningProfile, level: e.target.value})}
-                    placeholder="如：零基础"
+                    placeholder=""
                     className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 ) : (

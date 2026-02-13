@@ -195,10 +195,10 @@ const Stats: React.FC = () => {
               )}
               
               {aiLoading && (
-                <div className="flex-1 flex flex-col items-center justify-center">
-                  <span className="material-symbols-outlined text-4xl text-blue-500 animate-spin mb-2">autorenew</span>
+                <div className="flex-1 flex flex-col items-center justify-center animate-pulse">
+                  <span className="material-symbols-outlined text-4xl text-blue-400 mb-4 animate-spin">smart_toy</span>
                   <p className="text-slate-400">AI 正在规划中...</p>
-                  <p className="text-slate-300 text-xs mt-2">预计需要30秒...</p>
+                  <p className="text-slate-300 text-xs mt-2">预计需要1分钟...</p>
                 </div>
               )}
               
@@ -213,13 +213,18 @@ const Stats: React.FC = () => {
                 <div className="w-full bg-blue-50/50 rounded-xl p-6 text-left h-full overflow-y-auto custom-scrollbar">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
+                    components={{
+                      table: ({node, ...props}) => <table className="w-full border-collapse my-4 rounded-lg overflow-hidden shadow-sm border border-slate-300" {...props} />,
+                      thead: ({node, ...props}) => <thead className="bg-white border-b-2 border-slate-300" {...props} />,
+                      tbody: ({node, ...props}) => <tbody className="bg-white/50 divide-y divide-slate-300" {...props} />,
+                      tr: ({node, ...props}) => <tr className="border-b border-slate-300 last:border-0" {...props} />,
+                      th: ({node, ...props}) => <th className="border border-slate-300 p-3 text-xs font-bold text-slate-700 text-left bg-slate-50" {...props} />,
+                      td: ({node, ...props}) => <td className="border border-slate-300 p-3 text-xs text-slate-600" {...props} />,
+                    }}
                     className="prose prose-sm max-w-none text-slate-700 leading-relaxed 
                       prose-headings:font-bold prose-headings:text-slate-800 
                       prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
                       prose-strong:text-slate-900 prose-strong:font-black
-                      prose-table:border-collapse prose-table:w-full prose-table:my-4 prose-table:rounded-lg prose-table:overflow-hidden prose-table:shadow-sm
-                      prose-th:border-2 prose-th:border-slate-300 prose-th:bg-white prose-th:p-3 prose-th:text-xs prose-th:font-bold prose-th:text-slate-700 prose-th:text-left
-                      prose-td:border-2 prose-td:border-slate-300 prose-td:bg-white/50 prose-td:p-3 prose-td:text-xs prose-td:text-slate-600
                       prose-li:my-0.5 prose-p:my-2"
                   >
                     {aiOutput}
