@@ -34,7 +34,7 @@ export const userApi = {
   },
   uploadAvatar: async (userId: string, formData: FormData) => {
     try {
-      // 1. 获取文件并转换为 Base64 (因为 Supabase 可能限制了 Content-Type 或者 RLS)
+      // 1. 获取文件并转换为 Base64
       const file = formData.get('avatar') as File;
       if (!file) throw new Error('没有文件');
 
@@ -46,26 +46,35 @@ export const userApi = {
       });
       const base64Data = await base64Promise;
 
-      // 2. 调用后端 API，将文件和用户 ID 发送过去
-      const response = await fetch(`${API_URL}/user/avatar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          avatar_data: base64Data,
-          file_name: file.name
-        }),
-      });
+      // 2. 尝试直接更新 Supabase (适用于 GitHub Pages 等静态部署)
+      const { data, error } = await supabase
+        .from('users')
+        .update({
+          avatar_url: base64Data,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '上传失败');
+      if (error) {
+         console.warn('Supabase 直接更新失败，尝试后端 API', error);
+         // 如果 Supabase 直接更新失败（例如 RLS 限制），尝试回退到后端 API
+         // 注意：在 GitHub Pages 上，后端 API 可能不可用
+         try {
+             const response = await fetch(`${API_URL}/user/avatar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, avatar_data: base64Data, file_name: file.name }),
+             });
+             if (!response.ok) throw new Error('后端 API 请求失败');
+             return await response.json();
+         } catch (apiError) {
+             throw error; // 抛出最初的 Supabase 错误
+         }
       }
 
-      const data = await response.json();
-      return { status: 'ok', ...data };
+      return { status: 'ok', user: data, message: '头像上传成功' };
     } catch (error: any) {
       console.error('上传头像错误:', error);
       return { error: error.message || '上传失败' };
@@ -528,6 +537,7 @@ export const timeConsumptionApi = {
 export const aiApi = {
   deepseek: async (prompt: string, mode: 'encouragement' | 'plan' = 'encouragement') => {
     try {
+      // 1. 尝试调用后端 API
       const response = await fetch(`${API_URL}/ai/deepseek`, {
         method: 'POST',
         headers: {
@@ -537,21 +547,69 @@ export const aiApi = {
       });
 
       if (!response.ok) {
-        let errorMessage = `AI 请求失败: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (e) {
-          // Ignore JSON parse error
+        // 如果后端 API 失败 (例如 404, 405, 500)，尝试前端直接调用
+        // 注意：这通常不推荐，因为会暴露 API Key，但为了在静态托管(GitHub Pages)上演示功能，作为回退方案
+        console.warn('后端 AI API 失败，尝试前端直接调用 DeepSeek API');
+        
+        // 使用硬编码的 Key (风险提示：生产环境请勿这样做)
+        const DEEPSEEK_API_KEY = 'sk-c796903787ff48c297f3532c927d6143'; 
+        const directResponse = await fetch('https://api.deepseek.com/v1/chat/completions', { // 尝试 v1
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+           },
+           body: JSON.stringify({
+             model: 'deepseek-chat',
+             messages: [
+                { role: 'system', content: mode === 'encouragement' ? '你是一个温暖、治愈的心理咨询师朋友。' : '你是一个专业的学习规划师。' },
+                { role: 'user', content: prompt }
+             ],
+             temperature: 0.7
+           })
+        });
+
+        if (!directResponse.ok) {
+           // 如果直接调用也失败（例如 CORS）
+           const errText = await directResponse.text();
+           throw new Error(`AI 服务不可用 (后端: ${response.status}, 直接调用: ${directResponse.status} - ${errText})`);
         }
-        throw new Error(errorMessage);
+        
+        const data = await directResponse.json();
+        return { answer: data.choices[0].message.content };
       }
 
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
       console.error('AI API Error:', error);
+      // 如果是 fetch 本身的错误（如网络断开，或者 GitHub Pages 405），也尝试直接调用
+      if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('405'))) {
+          try {
+             console.warn('捕获到网络/405错误，尝试前端直接调用 DeepSeek API');
+             const DEEPSEEK_API_KEY = 'sk-c796903787ff48c297f3532c927d6143';
+             const directResponse = await fetch('https://api.deepseek.com/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+                },
+                body: JSON.stringify({
+                  model: 'deepseek-chat',
+                  messages: [
+                     { role: 'system', content: mode === 'encouragement' ? '你是一个温暖、治愈的心理咨询师朋友。' : '你是一个专业的学习规划师。' },
+                     { role: 'user', content: prompt }
+                  ],
+                  temperature: 0.7
+                })
+             });
+             if (directResponse.ok) {
+                 const data = await directResponse.json();
+                 return { answer: data.choices[0].message.content };
+             }
+          } catch (retryError) {
+              console.error('前端直接调用重试失败:', retryError);
+          }
+      }
       throw error;
     }
   },
