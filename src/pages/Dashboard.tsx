@@ -14,11 +14,11 @@ const Dashboard: React.FC = () => {
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   // 时间消耗相关状态
-  const [timeConsumption, setTimeConsumption] = useState({
+  const [timeConsumption, setTimeConsumption] = useState<any>({
     work: 0,
     game: 0,
     tiktok: 0,
-    study: 0
+    study: ''
   });
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [weeklyTimeData, setWeeklyTimeData] = useState<any[]>([]);
@@ -91,7 +91,7 @@ const Dashboard: React.FC = () => {
         work: 0,
         game: 0,
         tiktok: 0,
-        study: selectedDateData.study_hours || 0
+        study: selectedDateData.study_hours || ''
       });
       
       // 获取每周数据
@@ -241,7 +241,7 @@ const Dashboard: React.FC = () => {
                 min="0"
                 max="24"
                 value={timeConsumption.study}
-                onChange={(e) => setTimeConsumption({ ...timeConsumption, study: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => setTimeConsumption({ ...timeConsumption, study: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) })}
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

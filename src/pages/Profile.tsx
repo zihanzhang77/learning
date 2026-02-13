@@ -196,7 +196,7 @@ const Profile: React.FC = () => {
           {/* 晋升提示 */}
           {nextLevelInfo && (
             <p className="text-[10px] text-slate-400 mt-2 font-medium">
-              再坚持 {nextLevelInfo.daysNeeded} 天升级为{nextLevelInfo.next}
+              再学习 {nextLevelInfo.daysNeeded} 天升级为{nextLevelInfo.next}
             </p>
           )}
         </section>
@@ -204,25 +204,11 @@ const Profile: React.FC = () => {
         <section className="px-6 py-2 flex justify-around mb-4">
           <StatBox value={totalHours.toFixed(1)} label="累计学习时长" />
           <div className="w-[1px] h-8 bg-slate-100 self-center"></div>
-          <StatBox value={streak.toString()} label="坚持天数" />
+          <StatBox value={streak.toString()} label="学习天数" />
         </section>
 
         <section className="px-6 mb-8">
-          <div 
-            onClick={handleModifyGoal}
-            className="bg-slate-50 rounded-2xl p-5 active:scale-[0.98] transition-transform cursor-pointer"
-          >
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-slate-400 text-xl">flag</span>
-                <span className="text-[15px] font-bold text-slate-700">每日目标</span>
-              </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-[15px] font-black text-slate-900">{Math.round(goalProgress.target)}</span>
-                <span className="text-[13px] text-slate-400 font-bold">分钟</span>
-              </div>
-            </div>
-          </div>
+          
         </section>
 
         <section className="mt-8 border-t border-slate-50">
