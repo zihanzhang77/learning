@@ -11,6 +11,7 @@ interface User {
   learning_topic?: string;
   target_goal?: string;
   current_level?: string;
+  learning_plan?: string;
 }
 
 interface UserContextType {

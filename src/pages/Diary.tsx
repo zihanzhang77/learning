@@ -10,6 +10,7 @@ interface Diary {
   title: string;
   content: string;
   created_at: string;
+  ai_encouragement?: string;
 }
 
 const Diary: React.FC = () => {
@@ -49,6 +50,7 @@ const Diary: React.FC = () => {
     if (existing) {
       setTitle(existing.title);
       setContent(existing.content);
+      setAiEncouragement(existing.ai_encouragement || null);
       return;
     }
 
@@ -57,10 +59,12 @@ const Diary: React.FC = () => {
     if (data) {
       setTitle(data.title);
       setContent(data.content);
+      setAiEncouragement(data.ai_encouragement || null);
     } else {
       // 如果没有记录，清空输入框
       setTitle('');
       setContent('');
+      setAiEncouragement(null);
     }
   };
 
@@ -123,6 +127,14 @@ const Diary: React.FC = () => {
 ${recentDiaries}`;
       const response = await aiApi.deepseek(prompt);
       setAiEncouragement(response.answer);
+      
+      // 保存 AI 鼓励
+      try {
+        await diaryApi.saveAiEncouragement(user.id, selectedDate, response.answer);
+      } catch (saveError) {
+        console.error('保存 AI 鼓励失败:', saveError);
+        // 不阻断流程，因为已经在前端显示了
+      }
     } catch (error: any) {
       console.error(error);
       setAiEncouragement(`AI 暂时休息了 (错误: ${error.message || '未知错误'})`);
@@ -146,7 +158,8 @@ ${recentDiaries}`;
             <div className="mb-8 overflow-x-auto pb-2 custom-scrollbar">
               <div className="flex items-center space-x-3">
                 {Array.from({ length: 7 }).map((_, i) => {
-                  const date = subDays(new Date(), 6 - i);
+                  const centerDate = selectedDate ? new Date(selectedDate) : new Date();
+                  const date = addDays(centerDate, i - 3);
                   const dateStr = format(date, 'yyyy-MM-dd');
                   const isSelected = selectedDate === dateStr;
                   const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;

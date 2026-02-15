@@ -12,7 +12,7 @@ interface AiContextType {
   setAiOutput: (output: string | null) => void;
   aiLoading: boolean;
   aiError: string | null;
-  generatePlan: () => Promise<void>;
+  generatePlan: () => Promise<string | null>;
 }
 
 const AiContext = createContext<AiContextType | undefined>(undefined);
@@ -26,10 +26,10 @@ export const AiProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [aiError, setAiError] = useState<string | null>(null);
 
   const generatePlan = async () => {
-    if (!selectedTopic) return;
+    if (!selectedTopic) return null;
     
     // 如果已经在生成中，不要重复触发
-    if (aiLoading) return;
+    if (aiLoading) return null;
 
     setAiLoading(true);
     setAiError(null);
@@ -147,6 +147,7 @@ export const AiProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       // 这里的 Promise 在组件卸载后仍然会继续执行，因为 Context 依然存在
       const data = await aiApi.deepseek(prompt, 'plan');
       setAiOutput(data.answer);
+      return data.answer;
     } catch (error: any) {
       console.error('AI 请求失败:', error);
       // 获取更详细的错误信息
@@ -160,6 +161,7 @@ export const AiProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         }
       }
       setAiError(errorMessage);
+      return null;
     } finally {
       setAiLoading(false);
     }

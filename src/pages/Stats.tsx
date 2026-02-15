@@ -65,6 +65,10 @@ const Stats: React.FC = () => {
       if (activeTab === 'week') {
         loadWeeklyStats();
       }
+      // 如果没有 AI 输出，且用户有保存的学习计划，则加载
+      if (!aiOutput && user.learning_plan) {
+        setAiOutput(user.learning_plan);
+      }
     }
   }, [user, activeTab]);
 
@@ -140,7 +144,7 @@ const Stats: React.FC = () => {
   };
 
   const handleGeneratePlan = async () => {
-    // 1. 先保存用户学习偏好到 Supabase (优先保存，避免等待 AI 生成时用户退出导致数据丢失)
+    // 1. 先保存用户学习偏好到 Supabase
     if (user) {
       try {
         await userApi.updateUser(user.id, {
@@ -149,7 +153,6 @@ const Stats: React.FC = () => {
           current_level: currentLevel
         });
         console.log('用户学习偏好已保存');
-        // 立即刷新用户状态，确保"我的"页面能同步获取最新数据
         await refreshUser();
       } catch (error) {
         console.error('保存用户学习偏好失败:', error);
@@ -157,7 +160,20 @@ const Stats: React.FC = () => {
     }
 
     // 2. 生成计划
-    await generatePlan();
+    const plan = await generatePlan();
+
+    // 3. 保存生成的计划
+    if (plan && user) {
+      try {
+        await userApi.updateUser(user.id, {
+          learning_plan: plan
+        });
+        console.log('用户学习计划已保存');
+        await refreshUser();
+      } catch (error) {
+        console.error('保存用户学习计划失败:', error);
+      }
+    }
   };
 
   const handleRegenerate = () => {
@@ -264,11 +280,7 @@ const Stats: React.FC = () => {
                     <input
                       type="text"
                       value={selectedTopic}
-                      onChange={(e) => {
-                        setSelectedTopic(e.target.value);
-                        setIsTopicDropdownOpen(true);
-                      }}
-                      onFocus={() => setIsTopicDropdownOpen(true)}
+                      onChange={(e) => setSelectedTopic(e.target.value)}
                       placeholder="下拉看看大家都在学什么"
                       disabled={aiLoading}
                       className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"
@@ -302,19 +314,15 @@ const Stats: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-3">
                   {/* 第二步：达成目标 */}
-                  <div className="flex-1" ref={targetDropdownRef}>
+                  <div className="w-full" ref={targetDropdownRef}>
                     <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">达成目标</label>
                     <div className="relative">
                       <input
                         type="text"
                         value={targetGoal}
-                        onChange={(e) => {
-                          setTargetGoal(e.target.value);
-                          setIsTargetDropdownOpen(true);
-                        }}
-                        onFocus={() => setIsTargetDropdownOpen(true)}
+                        onChange={(e) => setTargetGoal(e.target.value)}
                         placeholder="输入或选择"
                         disabled={aiLoading}
                         className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"
@@ -349,17 +357,13 @@ const Stats: React.FC = () => {
                   </div>
 
                   {/* 第三步：当前水平 */}
-                  <div className="flex-1" ref={levelDropdownRef}>
+                  <div className="w-full" ref={levelDropdownRef}>
                     <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">当前水平</label>
                     <div className="relative">
                       <input
                         type="text"
                         value={currentLevel}
-                        onChange={(e) => {
-                          setCurrentLevel(e.target.value);
-                          setIsLevelDropdownOpen(true);
-                        }}
-                        onFocus={() => setIsLevelDropdownOpen(true)}
+                        onChange={(e) => setCurrentLevel(e.target.value)}
                         placeholder="输入或选择"
                         disabled={aiLoading}
                         className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 placeholder:text-slate-400"

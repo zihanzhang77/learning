@@ -162,6 +162,40 @@ export const authApi = {
 
 // 计时器API
 export const diaryApi = {
+  // 更新日记AI鼓励
+  saveAiEncouragement: async (userId: string, date: string, encouragement: string) => {
+    try {
+      // 检查是否存在
+      const { data: existing } = await supabase
+        .from('diaries')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .single();
+
+      if (existing) {
+        // 更新
+        const { data, error } = await supabase
+          .from('diaries')
+          .update({ ai_encouragement: encouragement, updated_at: new Date() })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data;
+      } else {
+        // 如果日记不存在，理论上不应该发生，因为是基于日记生成的。
+        // 但为了健壮性，可以创建一个只包含鼓励的记录（或者抛出错误）
+        // 这里选择抛出错误，提示用户先写日记
+        throw new Error('日记不存在，无法保存鼓励');
+      }
+    } catch (error) {
+      console.error('保存AI鼓励失败:', error);
+      throw error;
+    }
+  },
+  
   // 获取日记列表
   getDiaries: async (userId: string) => {
     try {
