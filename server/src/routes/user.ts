@@ -117,12 +117,6 @@ router.put('/:userId', async (req, res) => {
   }
 });
 
-    res.json(data);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // 上传头像 (Base64 版本)
 router.post('/avatar', async (req, res) => {
   try {
