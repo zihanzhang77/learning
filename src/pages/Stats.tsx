@@ -71,6 +71,11 @@ const Stats: React.FC = () => {
       // 如果没有 AI 输出，且用户有保存的学习计划，则加载
       if (!aiOutput && user.learning_plan) {
         setAiOutput(user.learning_plan);
+        // 同步更新聊天记录，确保内容能显示出来
+        setChatHistory([{
+          role: 'assistant',
+          content: user.learning_plan
+        }]);
       }
     }
   }, [user, activeTab]);
