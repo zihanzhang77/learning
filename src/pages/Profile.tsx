@@ -42,7 +42,7 @@ const Profile: React.FC = () => {
     
     try {
       setLoading(true);
-      const safeRequest = async <T>(promise: Promise<T>, defaultValue: T): Promise<T> => {
+      const safeRequest = async <T,>(promise: Promise<T>, defaultValue: T): Promise<T> => {
         try {
           return await promise;
         } catch (error) {
@@ -54,11 +54,11 @@ const Profile: React.FC = () => {
       // 并行获取所有数据，包括用户信息
       const [userData, allStats, totalManualStudyHours, totalDaysData, goal, todayStats] = await Promise.all([
         safeRequest(userApi.getUser(user.id), {}),
-        safeRequest(statsApi.getStats(user.id, 'all'), { total_hours: 0 }),
+        safeRequest(statsApi.getStats(user.id, 'all'), { total_hours: 0, avg_hours: 0, study_days_count: 0 }),
         safeRequest(timeConsumptionApi.getTotalManualTime(user.id), 0),
         safeRequest(timerApi.getTotalDays(user.id), { total_days: 0 }),
         safeRequest(goalApi.getGoal(user.id), { daily_study_hours: 2 }),
-        safeRequest(statsApi.getStats(user.id, 'day'), { total_hours: 0 })
+        safeRequest(statsApi.getStats(user.id, 'day'), { total_hours: 0, avg_hours: 0, study_days_count: 0 })
       ]);
 
       setLearningProfile({

@@ -10,7 +10,7 @@ import Calendar from '../components/Calendar';
 const Stats: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'day' | 'week' | 'month' | 'all'>('week');
   const [statsData, setStatsData] = useState<any>(null);
-  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [weeklyData, setWeeklyData] = useState<any>(null);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -23,7 +23,7 @@ const Stats: React.FC = () => {
     selectedTopic, setSelectedTopic, 
     targetGoal, setTargetGoal,
     currentLevel, setCurrentLevel,
-    aiOutput, aiLoading, aiError, generatePlan,
+    aiOutput, aiLoading, aiError, generatePlan, setAiError,
     setAiOutput, sendMessage, chatHistory, setChatHistory
   } = useAi();
 
@@ -86,7 +86,7 @@ const Stats: React.FC = () => {
     try {
       setLoading(true);
       
-      const safeRequest = async <T>(promise: Promise<T>, defaultValue: T): Promise<T> => {
+      const safeRequest = async <T,>(promise: Promise<T>, defaultValue: T): Promise<T> => {
         try {
           return await promise;
         } catch (error) {
@@ -102,7 +102,7 @@ const Stats: React.FC = () => {
         timeConsumptionData, 
         weeklyTimeConsumption
       ] = await Promise.all([
-        safeRequest(statsApi.getStats(user.id, activeTab), { total_hours: 0, avg_hours: 0 }),
+        safeRequest(statsApi.getStats(user.id, activeTab), { total_hours: 0, avg_hours: 0, study_days_count: 0 }),
         safeRequest(activeTab !== 'month' ? timerApi.getTotalDays(user.id) : Promise.resolve({ total_days: 0 }), { total_days: 0 }),
         safeRequest(timeConsumptionApi.getTimeConsumption(user.id, new Date().toISOString().split('T')[0]), { study_hours: 0 }),
         safeRequest((async () => {

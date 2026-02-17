@@ -11,11 +11,12 @@ interface AiContextType {
   aiOutput: string | null;
   setAiOutput: (output: string | null) => void;
   // 聊天历史相关
-  chatHistory: { role: 'user' | 'assistant'; content: string; reasoning?: string }[];
-  setChatHistory: React.Dispatch<React.SetStateAction<{ role: 'user' | 'assistant'; content: string; reasoning?: string }[]>>;
+  chatHistory: { role: 'system' | 'user' | 'assistant'; content: string; reasoning?: string }[];
+  setChatHistory: React.Dispatch<React.SetStateAction<{ role: 'system' | 'user' | 'assistant'; content: string; reasoning?: string }[]>>;
   sendMessage: (content: string) => Promise<void>;
   aiLoading: boolean;
   aiError: string | null;
+  setAiError: (error: string | null) => void;
   generatePlan: () => Promise<string | null>;
   
   // 鼓励相关
@@ -245,7 +246,7 @@ export const AiProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       currentLevel, setCurrentLevel,
       aiOutput, setAiOutput,
       chatHistory, setChatHistory, sendMessage, // 新增导出
-      aiLoading, aiError, generatePlan,
+      aiLoading, aiError, setAiError, generatePlan,
       encouragementStates, generateEncouragement
     }}>
       {children}

@@ -12,7 +12,6 @@ const Dashboard: React.FC = () => {
   const [totalMinutes, setTotalMinutes] = useState(11112);
   const [todayProgress, setTodayProgress] = useState(75);
   const [dailyGoal, setDailyGoal] = useState(10);
-  const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   // 时间消耗相关状态
   const [timeConsumption, setTimeConsumption] = useState<any>({
@@ -23,6 +22,8 @@ const Dashboard: React.FC = () => {
   });
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [weeklyTimeData, setWeeklyTimeData] = useState<any[]>([]);
+  const [weeklyData, setWeeklyData] = useState<any>(null);
+
   const [streak, setStreak] = useState(0);
   const [learningProfile, setLearningProfile] = useState({
     topic: '',
@@ -63,7 +64,7 @@ const Dashboard: React.FC = () => {
       const sundayStr = sunday.toISOString().split('T')[0];
 
       // Parallelize all requests with error handling
-      const safeRequest = async <T>(promise: Promise<T>, defaultValue: T): Promise<T> => {
+      const safeRequest = async <T,>(promise: Promise<T>, defaultValue: T): Promise<T> => {
         try {
           return await promise;
         } catch (error) {
@@ -79,16 +80,16 @@ const Dashboard: React.FC = () => {
         selectedDateData,
         totalManualStudyHours,
         todayStats,
-        weekly,
+        _weekly,
         weeklyTimeData,
         userData
       ] = await Promise.all([
         safeRequest(goalApi.getGoal(userId), { total_study_hours: 200, daily_study_hours: 2 }),
-        safeRequest(statsApi.getStats(userId, 'all'), { total_hours: 0 }),
+        safeRequest(statsApi.getStats(userId, 'all'), { total_hours: 0, avg_hours: 0, study_days_count: 0 }),
         safeRequest(attendanceApi.getAttendance(userId), []),
         safeRequest(timeConsumptionApi.getTimeConsumption(userId, selectedDate), { study_hours: 0 }),
         safeRequest(timeConsumptionApi.getTotalManualTime(userId), 0),
-        safeRequest(statsApi.getStats(userId, 'day'), { total_hours: 0 }),
+        safeRequest(statsApi.getStats(userId, 'day'), { total_hours: 0, avg_hours: 0, study_days_count: 0 }),
         safeRequest(statsApi.getWeeklyStats(userId), { labels: [], datasets: [] }),
         safeRequest(timeConsumptionApi.getTimeConsumptionRange(userId, mondayStr, sundayStr), []),
         safeRequest(userApi.getUser(userId), {})
@@ -135,7 +136,6 @@ const Dashboard: React.FC = () => {
         study: selectedDateData.study_hours || ''
       });
       
-      setWeeklyData(weekly);
       setWeeklyTimeData(weeklyTimeData);
 
     } catch (error) {

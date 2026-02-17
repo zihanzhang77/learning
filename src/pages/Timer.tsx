@@ -135,12 +135,14 @@ const Timer: React.FC = () => {
       const tiktokHours = timers.tiktok.seconds / 3600;
       const studyHours = timers.study.seconds / 3600;
       
-      await timeConsumptionApi.saveTimeConsumption(userId, selectedDate, {
-        work_hours: parseFloat(workHours.toFixed(1)),
-        game_hours: parseFloat(gameHours.toFixed(1)),
-        tiktok_hours: parseFloat(tiktokHours.toFixed(1)),
-        study_hours: parseFloat(studyHours.toFixed(1))
-      });
+      await timeConsumptionApi.saveTimeConsumption(
+        userId, 
+        selectedDate, 
+        parseFloat(workHours.toFixed(1)),
+        parseFloat(gameHours.toFixed(1)),
+        parseFloat(tiktokHours.toFixed(1)),
+        parseFloat(studyHours.toFixed(1))
+      );
       
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
