@@ -548,12 +548,6 @@ export const timeConsumptionApi = {
   },
   getTotalManualTime: async (userId: string) => {
     try {
-      // Attempt to use RPC first
-      const { data, error } = await supabase.rpc('get_total_manual_study_hours', { user_uuid: userId });
-      if (error) throw error;
-      return Number(data) || 0;
-    } catch (e) {
-      console.warn('RPC failed, falling back to full fetch', e);
       // Fallback to fetching all (optimized by selecting only study_hours)
       const { data, error } = await supabase
         .from('user_time_consumption')
@@ -562,6 +556,9 @@ export const timeConsumptionApi = {
         
       if (error) throw error;
       return data?.reduce((sum, item) => sum + (Number(item.study_hours) || 0), 0) || 0;
+    } catch (e) {
+      console.warn('Failed to get manual time:', e);
+      return 0;
     }
   },
   saveTimeConsumption: async (userId: string, date: string, workHours: number, gameHours: number, tiktokHours: number, studyHours: number) => {

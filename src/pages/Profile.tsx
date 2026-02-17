@@ -10,6 +10,7 @@ import remarkGfm from 'remark-gfm';
 
 const Profile: React.FC = () => {
   const { user, logout, refreshUser } = useUser();
+  const [loading, setLoading] = useState(true);
   const [totalHours, setTotalHours] = useState(0);
   const [streak, setStreak] = useState(0);
   const [dailyGoal, setDailyGoal] = useState(2);
