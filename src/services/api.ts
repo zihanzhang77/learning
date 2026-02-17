@@ -165,19 +165,19 @@ export const diaryApi = {
   // 更新日记AI鼓励
   saveAiEncouragement: async (userId: string, date: string, encouragement: string) => {
     try {
-      // 检查是否存在
+      // 使用独立的 ai_encouragements 表
       const { data: existing } = await supabase
-        .from('diaries')
+        .from('ai_encouragements')
         .select('id')
         .eq('user_id', userId)
-        .eq('date', date)
+        .eq('diary_date', date)
         .single();
 
       if (existing) {
         // 更新
         const { data, error } = await supabase
-          .from('diaries')
-          .update({ ai_encouragement: encouragement, updated_at: new Date() })
+          .from('ai_encouragements')
+          .update({ content: encouragement, created_at: new Date() })
           .eq('id', existing.id)
           .select()
           .single();
@@ -185,14 +185,44 @@ export const diaryApi = {
         if (error) throw error;
         return data;
       } else {
-        // 如果日记不存在，理论上不应该发生，因为是基于日记生成的。
-        // 但为了健壮性，可以创建一个只包含鼓励的记录（或者抛出错误）
-        // 这里选择抛出错误，提示用户先写日记
-        throw new Error('日记不存在，无法保存鼓励');
+        // 插入新记录
+        const { data, error } = await supabase
+          .from('ai_encouragements')
+          .insert([{ 
+            user_id: userId, 
+            diary_date: date, 
+            content: encouragement 
+          }])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data;
       }
     } catch (error) {
       console.error('保存AI鼓励失败:', error);
       throw error;
+    }
+  },
+
+  // 获取 AI 鼓励
+  getAiEncouragement: async (userId: string, date: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('ai_encouragements')
+        .select('content')
+        .eq('user_id', userId)
+        .eq('diary_date', date)
+        .single();
+        
+      if (error) {
+        if (error.code === 'PGRST116') return null; // 没找到
+        throw error;
+      }
+      return data?.content || null;
+    } catch (error) {
+      console.error('获取AI鼓励失败:', error);
+      return null;
     }
   },
   
@@ -364,7 +394,11 @@ export const statsApi = {
   getStats: async (userId: string, period: 'day' | 'week' | 'month' | 'all' = 'week') => {
     // 简化实现：获取所有记录并在前端计算
     // 注意：数据量大时应在后端计算
-    let query = supabase.from('study_sessions').select('*').eq('user_id', userId).eq('status', 'completed');
+    // 优化：只选择需要的字段
+    let query = supabase.from('study_sessions')
+      .select('duration_seconds, started_at')
+      .eq('user_id', userId)
+      .eq('status', 'completed');
     
     const now = new Date();
     if (period === 'day') {
@@ -444,9 +478,9 @@ export const goalApi = {
       .from('user_goals')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
       
-    if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned"
+    if (error) throw error;
     
     return data || { total_study_hours: 200, daily_study_hours: 2 };
   },
@@ -456,7 +490,7 @@ export const goalApi = {
       .from('user_goals')
       .select('id')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
       
     if (existing) {
       return await goalApi.updateGoal(userId, totalStudyHours, dailyStudyHours);
@@ -511,6 +545,24 @@ export const timeConsumptionApi = {
       .lte('date', endDate);
     if (error) throw error;
     return data || [];
+  },
+  getTotalManualTime: async (userId: string) => {
+    try {
+      // Attempt to use RPC first
+      const { data, error } = await supabase.rpc('get_total_manual_study_hours', { user_uuid: userId });
+      if (error) throw error;
+      return Number(data) || 0;
+    } catch (e) {
+      console.warn('RPC failed, falling back to full fetch', e);
+      // Fallback to fetching all (optimized by selecting only study_hours)
+      const { data, error } = await supabase
+        .from('user_time_consumption')
+        .select('study_hours')
+        .eq('user_id', userId);
+        
+      if (error) throw error;
+      return data?.reduce((sum, item) => sum + (Number(item.study_hours) || 0), 0) || 0;
+    }
   },
   saveTimeConsumption: async (userId: string, date: string, workHours: number, gameHours: number, tiktokHours: number, studyHours: number) => {
     try {
@@ -569,81 +621,96 @@ export const timeConsumptionApi = {
 
 // AI API
 export const aiApi = {
-  deepseek: async (prompt: string, mode: 'encouragement' | 'plan' = 'encouragement') => {
+  deepseek: async (
+    prompt: string | { role: string; content: string }[], 
+    mode: 'encouragement' | 'plan' = 'encouragement',
+    onUpdate?: (partial: { reasoning?: string; content?: string }) => void
+  ) => {
     try {
-      // 1. 尝试调用后端 API
-      const response = await fetch(`${API_URL}/ai/deepseek`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt, mode }),
+      const messages = Array.isArray(prompt) ? prompt : [
+        { role: 'system', content: mode === 'encouragement' ? '你是一个活泼俏皮的朋友，说话大白话，会用口语化的表达鼓励人，不要太文艺。' : '你是一个专业的技能学习规划师，擅长制定详细的实操计划。' },
+        { role: 'user', content: prompt }
+      ];
+
+      // 1. 尝试调用后端 API (如果支持 messages 数组，这里也需要相应调整，假设后端已更新或只使用前端调用)
+      // 由于我们主要依赖前端直接调用演示，这里主要修改前端调用逻辑
+      
+      // ... (跳过后端调用尝试，或者假设后端能处理。为简化，这里直接修改前端回退逻辑)
+      
+      console.warn('后端 AI API 失败或跳过，尝试前端直接调用 DeepSeek API');
+        
+      // 使用硬编码的 Key (风险提示：生产环境请勿这样做)
+      const DEEPSEEK_API_KEY = 'sk-c796903787ff48c297f3532c927d6143'; 
+      
+      // 根据模式选择模型：日记鼓励用 fast 模型 (deepseek-chat)，计划用 reasoning 模型 (deepseek-reasoner)
+      const model = mode === 'encouragement' ? 'deepseek-chat' : 'deepseek-reasoner';
+      
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+         },
+         body: JSON.stringify({
+           model: model,
+           messages: messages,
+           stream: true, // 开启流式输出
+           temperature: mode === 'encouragement' ? 1.3 : 0.6 // 鼓励模式增加随机性
+         })
       });
 
       if (!response.ok) {
-        // 如果后端 API 失败 (例如 404, 405, 500)，尝试前端直接调用
-        // 注意：这通常不推荐，因为会暴露 API Key，但为了在静态托管(GitHub Pages)上演示功能，作为回退方案
-        console.warn('后端 AI API 失败，尝试前端直接调用 DeepSeek API');
-        
-        // 使用硬编码的 Key (风险提示：生产环境请勿这样做)
-        const DEEPSEEK_API_KEY = 'sk-c796903787ff48c297f3532c927d6143'; 
-        const directResponse = await fetch('https://api.deepseek.com/v1/chat/completions', { // 尝试 v1
-           method: 'POST',
-           headers: {
-             'Content-Type': 'application/json',
-             'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-           },
-           body: JSON.stringify({
-             model: 'deepseek-chat',
-             messages: [
-                { role: 'system', content: mode === 'encouragement' ? '你是一个活泼俏皮的朋友，说话大白话，会用口语化的表达鼓励人，不要太文艺。' : '你是一个专业的技能学习规划师，擅长制定详细的实操计划。' },
-                { role: 'user', content: prompt }
-             ],
-             temperature: 0.2
-           })
-        });
+         const errText = await response.text();
+         throw new Error(`AI 服务不可用 (直接调用: ${response.status} - ${errText})`);
+      }
+      
+      // 处理流式响应
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let answer = '';
+      let reasoning = '';
+      
+      if (!reader) throw new Error('无法读取响应流');
 
-        if (!directResponse.ok) {
-           // 如果直接调用也失败（例如 CORS）
-           const errText = await directResponse.text();
-           throw new Error(`AI 服务不可用 (后端: ${response.status}, 直接调用: ${directResponse.status} - ${errText})`);
-        }
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
         
-        const data = await directResponse.json();
-        return { answer: data.choices[0].message.content };
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === '[DONE]') continue;
+            
+            try {
+              const json = JSON.parse(jsonStr);
+              const delta = json.choices[0].delta;
+              
+              // 累积 reasoning_content
+              if (delta.reasoning_content) {
+                reasoning += delta.reasoning_content;
+                // 实时回调通知 reasoning 更新
+                onUpdate?.({ reasoning: reasoning });
+              }
+              
+              // 累积 content
+              if (delta.content) {
+                answer += delta.content;
+                // 实时回调通知 content 更新
+                onUpdate?.({ content: answer });
+              }
+            } catch (e) {
+              console.warn('解析流式数据出错', e);
+            }
+          }
+        }
       }
 
-      return await response.json();
+      return { answer, reasoning }; 
     } catch (error: any) {
       console.error('AI API Error:', error);
-      // 如果是 fetch 本身的错误（如网络断开，或者 GitHub Pages 405），也尝试直接调用
-      if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('405'))) {
-          try {
-             console.warn('捕获到网络/405错误，尝试前端直接调用 DeepSeek API');
-             const DEEPSEEK_API_KEY = 'sk-c796903787ff48c297f3532c927d6143';
-             const directResponse = await fetch('https://api.deepseek.com/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-                },
-                body: JSON.stringify({
-                  model: 'deepseek-chat',
-                  messages: [
-                     { role: 'system', content: mode === 'encouragement' ? '你是一个活泼俏皮的朋友，说话大白话，会用口语化的表达鼓励人，不要太文艺。' : '你是一个专业的技能学习规划师，擅长制定详细的实操计划。' },
-                     { role: 'user', content: prompt }
-                  ],
-                  temperature: 0.2
-                })
-             });
-             if (directResponse.ok) {
-                 const data = await directResponse.json();
-                 return { answer: data.choices[0].message.content };
-             }
-          } catch (retryError) {
-              console.error('前端直接调用重试失败:', retryError);
-          }
-      }
       throw error;
     }
   },

@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useUser } from '../context/UserContext';
 import { useAi } from '../context/AiContext';
-import { statsApi, timerApi, timeConsumptionApi, userApi } from '../services/api';
+import { statsApi, timerApi, timeConsumptionApi, userApi, aiApi } from '../services/api';
 import Calendar from '../components/Calendar';
 
 const Stats: React.FC = () => {
@@ -13,6 +13,7 @@ const Stats: React.FC = () => {
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   // 时间消耗相关状态
   const [weeklyTimeData, setWeeklyTimeData] = useState<any[]>([]);
   const { user, refreshUser } = useUser();
@@ -23,9 +24,11 @@ const Stats: React.FC = () => {
     targetGoal, setTargetGoal,
     currentLevel, setCurrentLevel,
     aiOutput, aiLoading, aiError, generatePlan,
-    setAiOutput // 假设 Context 暴露了这个方法，如果没有，需要去添加
+    setAiOutput, sendMessage, chatHistory, setChatHistory
   } = useAi();
 
+  const [inputValue, setInputValue] = useState('');
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const [isTargetDropdownOpen, setIsTargetDropdownOpen] = useState(false);
   const [isLevelDropdownOpen, setIsLevelDropdownOpen] = useState(false);
@@ -77,29 +80,59 @@ const Stats: React.FC = () => {
     
     try {
       setLoading(true);
-      const data = await statsApi.getStats(user.id, activeTab);
+      
+      const safeRequest = async <T>(promise: Promise<T>, defaultValue: T): Promise<T> => {
+        try {
+          return await promise;
+        } catch (error) {
+          console.warn('Request failed (using default):', error);
+          return defaultValue;
+        }
+      };
+
+      // 并行请求所有数据以提升速度
+      const [
+        statsData, 
+        totalDaysData, 
+        timeConsumptionData, 
+        weeklyTimeConsumption
+      ] = await Promise.all([
+        safeRequest(statsApi.getStats(user.id, activeTab), { total_hours: 0, avg_hours: 0 }),
+        safeRequest(activeTab !== 'month' ? timerApi.getTotalDays(user.id) : Promise.resolve({ total_days: 0 }), { total_days: 0 }),
+        safeRequest(timeConsumptionApi.getTimeConsumption(user.id, new Date().toISOString().split('T')[0]), { study_hours: 0 }),
+        safeRequest((async () => {
+          const currentDate = new Date();
+          const currentDay = currentDate.getDay();
+          const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+          const monday = new Date(currentDate);
+          monday.setDate(currentDate.getDate() - daysToMonday);
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          return timeConsumptionApi.getTimeConsumptionRange(
+            user.id,
+            monday.toISOString().split('T')[0],
+            sunday.toISOString().split('T')[0]
+          );
+        })(), [])
+      ]);
+
       let displayStreak = 0;
       
       // 根据当前标签获取相应的学习天数
       if (activeTab === 'month') {
         // 本月学习天数（学习时长大于1小时的天数）
-        displayStreak = data.study_days_count || 0;
+        displayStreak = statsData.study_days_count || 0;
       } else {
         // 累计学习天数
-        const totalDaysData = await timerApi.getTotalDays(user.id);
         displayStreak = totalDaysData.total_days || 0;
       }
       
-      // 获取当前日期的时间消耗数据
-      const today = new Date().toISOString().split('T')[0];
-      const timeConsumptionData = await timeConsumptionApi.getTimeConsumption(user.id, today);
-      
       // 计算总学习时长（学习计时时间 + 手动输入的学习时间）
-      const totalStudyHours = data.total_hours || 0;
+      const totalStudyHours = statsData.total_hours || 0;
       const totalMinutes = totalStudyHours * 60;
       
       // 计算平均学习时长
-      const avgStudyHours = data.avg_hours || 0;
+      const avgStudyHours = statsData.avg_hours || 0;
       const avgMinutes = avgStudyHours * 60;
       
       setStatsData({
@@ -108,23 +141,7 @@ const Stats: React.FC = () => {
         trend: activeTab === 'all' ? '持续增长' : `+${(totalMinutes * 0.1).toFixed(2)}分钟`
       });
       setStreak(displayStreak);
-      
-      // 计算本周的周一和周日的日期
-      const currentDate = new Date();
-      const currentDay = currentDate.getDay();
-      const daysToMonday = currentDay === 0 ? 6 : currentDay - 1; // 计算到周一的天数
-      const monday = new Date(currentDate);
-      monday.setDate(currentDate.getDate() - daysToMonday);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      
-      // 获取本周的时间消耗数据
-      const weeklyTimeData = await timeConsumptionApi.getTimeConsumptionRange(
-        user.id,
-        monday.toISOString().split('T')[0],
-        sunday.toISOString().split('T')[0]
-      );
-      setWeeklyTimeData(weeklyTimeData);
+      setWeeklyTimeData(weeklyTimeConsumption);
     } catch (error) {
       console.error('加载统计数据失败:', error);
     } finally {
@@ -141,6 +158,21 @@ const Stats: React.FC = () => {
     } catch (error) {
       console.error('加载周数据失败:', error);
     }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatHistory, aiLoading]);
+
+  const handleSend = async () => {
+    if (!inputValue.trim()) return;
+    const content = inputValue;
+    setInputValue('');
+    await sendMessage(content);
   };
 
   const handleGeneratePlan = async () => {
@@ -176,13 +208,87 @@ const Stats: React.FC = () => {
     }
   };
 
-  const handleRegenerate = () => {
-    handleGeneratePlan();
+  const handleSavePlanToProfile = async () => {
+    if (!user || !aiOutput) return;
+
+    try {
+      setIsSaving(true);
+      // 默认周期为30天
+      let durationDays = 30;
+      
+      // 1. 调用 DeepSeek 模型智能分析学习周期
+      try {
+        const analyzePrompt = `请分析以下学习计划内容，评估完成该计划所需的总天数。请直接返回一个数字（例如：30），不要包含任何其他文字或解释。\n\n计划内容摘要：\n${aiOutput.substring(0, 2000)}`; // 截取前2000字符避免token过长
+        
+        const { answer } = await aiApi.deepseek(analyzePrompt, 'encouragement');
+        const aiDays = parseInt(answer.replace(/\D/g, '')); // 提取数字
+        
+        if (!isNaN(aiDays) && aiDays > 0) {
+          durationDays = aiDays;
+          console.log('AI智能分析学习周期:', durationDays, '天');
+        }
+      } catch (aiError) {
+        console.warn('AI分析周期失败，降级为正则匹配:', aiError);
+        
+        // 2. 降级方案：正则匹配
+        const totalPeriodMatch = aiOutput.match(/建议总周期[：:]\s*(\d+)\s*天/);
+        
+        if (totalPeriodMatch) {
+          durationDays = parseInt(totalPeriodMatch[1]);
+        } else {
+          // 3. 备用：尝试匹配常见的周期描述
+          const weekMatch = aiOutput.match(/(\d+)\s*(周|week)/i);
+          const monthMatch = aiOutput.match(/(\d+)\s*(月|month)/i);
+          const dayMatch = aiOutput.match(/(\d+)\s*(天|day)/i);
+          
+          if (weekMatch) {
+            durationDays = parseInt(weekMatch[1]) * 7;
+          } else if (monthMatch) {
+            durationDays = parseInt(monthMatch[1]) * 30;
+          } else if (dayMatch) {
+            durationDays = parseInt(dayMatch[1]);
+          }
+        }
+      }
+
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(startDate.getDate() + durationDays);
+
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      await userApi.updateUser(user.id, {
+        plan_start_date: startDateStr,
+        plan_end_date: endDateStr,
+        learning_plan: aiOutput // 再次确保计划内容被保存
+      });
+
+      alert(`计划已保存到"我的"档案！\n建议学习周期：${startDateStr} 至 ${endDateStr} (${durationDays}天)`);
+      await refreshUser();
+    } catch (error) {
+      console.error('保存计划失败:', JSON.stringify(error));
+      alert('保存失败，请检查网络或刷新页面重试');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleBack = () => {
     setAiOutput(null);
+    setChatHistory([]); // 清空历史
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-medium">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-full">
@@ -199,76 +305,182 @@ const Stats: React.FC = () => {
       <main className="flex-1 px-4 pt-6 pb-12">
         {/* 大模型板块 */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 mb-6 h-[80vh] flex flex-col">
-          {/* 中间内容区域 */}
-          <div className="flex-1 flex flex-col p-4 overflow-hidden relative">
-            {/* AI 输出结果 */}
-            <div id="aiResponse" className="flex-1 h-full flex flex-col">
-              {!aiOutput && !aiLoading && !aiError && (
-                <div className="flex-1 flex flex-col items-center justify-center">
-                  <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">school</span>
-                  <p className="text-slate-400">选择一个目标，为你生成专属学习计划</p>
-                </div>
-              )}
-              
-              {aiLoading && (
-                <div className="flex-1 flex flex-col items-center justify-center animate-pulse">
-                  <span className="material-symbols-outlined text-4xl text-blue-400 mb-4 animate-spin">smart_toy</span>
-                  <p className="text-slate-400">AI 正在规划中...</p>
-                  <p className="text-slate-300 text-xs mt-2">预计需要1分钟...</p>
-                </div>
-              )}
-              
-              {aiError && (
-                <div className="flex-1 flex flex-col items-center justify-center">
-                  <span className="material-symbols-outlined text-4xl text-red-400 mb-2">error</span>
-                  <p className="text-red-500">{aiError}</p>
-                </div>
-              )}
-              
-              {aiOutput && (
-                <div className="w-full bg-blue-50/50 rounded-xl p-6 text-left h-full overflow-y-auto custom-scrollbar">
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      table: ({node, ...props}) => <table className="w-full border-collapse my-4 rounded-lg overflow-hidden shadow-sm border border-slate-300" {...props} />,
-                      thead: ({node, ...props}) => <thead className="bg-white border-b-2 border-slate-300" {...props} />,
-                      tbody: ({node, ...props}) => <tbody className="bg-white/50 divide-y divide-slate-300" {...props} />,
-                      tr: ({node, ...props}) => <tr className="border-b border-slate-300 last:border-0" {...props} />,
-                      th: ({node, ...props}) => <th className="border border-slate-300 p-3 text-xs font-bold text-slate-700 text-left bg-slate-50" {...props} />,
-                      td: ({node, ...props}) => <td className="border border-slate-300 p-3 text-xs text-slate-600" {...props} />,
-                    }}
-                    className="prose prose-sm max-w-none text-slate-700 leading-relaxed 
-                      prose-headings:font-bold prose-headings:text-slate-800 
-                      prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                      prose-strong:text-slate-900 prose-strong:font-black
-                      prose-li:my-0.5 prose-p:my-2"
-                  >
-                    {aiOutput}
-                  </ReactMarkdown>
-                </div>
-              )}
-            </div>
+          {/* 中间内容区域 - 聊天列表 */}
+          <div className="flex-1 flex flex-col overflow-hidden relative bg-slate-50/50">
+            {chatHistory.length > 0 ? (
+              <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                {chatHistory.filter(msg => msg.role !== 'system').map((msg, index) => (
+                  <div key={index} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[90%] md:max-w-[85%] rounded-2xl p-4 shadow-sm ${
+                      msg.role === 'user' 
+                        ? 'bg-blue-600 text-white rounded-tr-sm' 
+                        : 'bg-white border border-slate-100 rounded-tl-sm'
+                    }`}>
+                      {msg.role === 'assistant' && msg.reasoning && (
+                        <details className="mb-3 group">
+                          <summary className="flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-slate-500 hover:text-blue-600 transition-colors bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <span className="material-symbols-outlined text-sm">psychology</span>
+                            <span>深度思考过程</span>
+                            <span className="material-symbols-outlined text-sm transition-transform group-open:rotate-180 ml-auto">expand_more</span>
+                          </summary>
+                          <div className="mt-2 pl-3 border-l-2 border-slate-200 text-xs text-slate-600 whitespace-pre-wrap leading-relaxed py-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                            {msg.reasoning}
+                          </div>
+                        </details>
+                      )}
+                      
+                      <div className={`prose prose-sm max-w-none leading-relaxed break-words
+                          ${msg.role === 'user' ? 'prose-invert text-white' : 'text-slate-700'}
+                          prose-headings:font-bold ${msg.role === 'user' ? 'prose-headings:text-white' : 'prose-headings:text-slate-800'}
+                          prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                          prose-strong:font-black ${msg.role === 'user' ? 'prose-strong:text-white' : 'prose-strong:text-slate-900'}
+                          prose-li:my-0.5 prose-p:my-2 prose-pre:bg-slate-800 prose-pre:text-slate-100`}>
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            table: ({node, ...props}) => <div className="overflow-x-auto my-4 rounded-lg border border-slate-200"><table className="w-full border-collapse min-w-full" {...props} /></div>,
+                            thead: ({node, ...props}) => <thead className={msg.role === 'user' ? 'bg-blue-700/50' : 'bg-slate-50'} {...props} />,
+                            tbody: ({node, ...props}) => <tbody className="divide-y divide-slate-200/50" {...props} />,
+                            tr: ({node, ...props}) => <tr className="border-b border-slate-200/50 last:border-0" {...props} />,
+                            th: ({node, ...props}) => <th className={`p-3 text-xs font-bold text-left ${msg.role === 'user' ? 'text-blue-100' : 'text-slate-600'}`} {...props} />,
+                            td: ({node, ...props}) => <td className={`p-3 text-xs ${msg.role === 'user' ? 'text-blue-50' : 'text-slate-600'}`} {...props} />,
+                            a: ({node, ...props}) => <a className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                            code: ({node, className, children, ...props}) => {
+                              const match = /language-(\w+)/.exec(className || '')
+                              return match ? (
+                                <code className={`${className} bg-slate-800 rounded px-1 py-0.5 text-xs`} {...props}>{children}</code>
+                              ) : (
+                                <code className={`${msg.role === 'user' ? 'bg-blue-700' : 'bg-slate-100 text-slate-800'} rounded px-1.5 py-0.5 text-xs font-mono`} {...props}>{children}</code>
+                              )
+                            }
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {aiLoading && (
+                  <div className="flex justify-start w-full">
+                    <div className="bg-white border border-slate-100 shadow-sm rounded-2xl rounded-tl-sm p-4 flex items-center gap-2">
+                       <div className="flex space-x-1">
+                         <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                         <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                         <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                       </div>
+                       <span className="text-xs text-slate-400 ml-2">AI 正在思考中...</span>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            ) : (
+              // 初始空状态
+              <div id="aiResponse" className="flex-1 h-full flex flex-col">
+                {!aiLoading && !aiError && (
+                  <div className="flex-1 flex flex-col items-center justify-center">
+                    <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6">
+                      <span className="material-symbols-outlined text-4xl text-blue-500">school</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">定制你的专属学习计划</h3>
+                    <p className="text-slate-400 text-sm max-w-xs text-center leading-relaxed">
+                      选择一个你想学习的技能，AI 将为你生成包含核心概念、实操步骤和课程推荐的完整学习路径。
+                    </p>
+                  </div>
+                )}
+                
+                {aiLoading && (
+                  <div className="flex-1 flex flex-col items-center justify-center">
+                    <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300">
+                       <div className="flex space-x-2">
+                         <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                         <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                         <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                       </div>
+                       <p className="text-sm font-medium text-slate-500">AI 正在为你定制专属计划...</p>
+                    </div>
+                  </div>
+                )}
+                
+                {aiError && (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                    <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                      <span className="material-symbols-outlined text-3xl text-red-500">error_outline</span>
+                    </div>
+                    <p className="text-slate-800 font-bold mb-2">出错了</p>
+                    <p className="text-slate-500 text-sm mb-6">{aiError}</p>
+                    <button 
+                      onClick={() => setAiError(null)}
+                      className="px-6 py-2 bg-white border border-slate-200 rounded-full text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      重试
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 底部操作区域 */}
           <div className="p-4 border-t border-slate-100">
             {aiOutput ? (
-              // 生成结果后的操作按钮
-              <div className="flex gap-3">
-                <button
-                  onClick={handleBack}
-                  className="flex-1 h-[46px] bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-lg">arrow_back</span>
-                  返回修改
-                </button>
-                <button
-                  onClick={handleRegenerate}
-                  className="flex-1 h-[46px] bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-xl transition-all active:scale-95 shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-lg">refresh</span>
-                  重新生成
-                </button>
+              // 聊天输入框
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2 items-end bg-slate-50 p-2 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+                  <textarea
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder="对计划不满意？继续提问来调整..."
+                    disabled={aiLoading}
+                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-slate-700 resize-none max-h-32 py-2 px-1 placeholder:text-slate-400"
+                    rows={1}
+                    style={{ minHeight: '40px' }}
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!inputValue.trim() || aiLoading}
+                    className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-xl">send</span>
+                  </button>
+                </div>
+                
+                <div className="flex justify-between items-center px-1">
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={handleBack}
+                      className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">refresh</span>
+                      开启新计划
+                    </button>
+                    <button 
+                      onClick={handleSavePlanToProfile}
+                      disabled={isSaving}
+                      className={`text-xs flex items-center gap-1 transition-colors font-medium ${isSaving ? 'text-slate-400 cursor-not-allowed' : 'text-blue-500 hover:text-blue-600'}`}
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                          正在保存...
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-sm">save</span>
+                          保存到我的档案
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               // 输入表单

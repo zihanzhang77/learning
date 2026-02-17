@@ -1,13 +1,25 @@
 
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './src/context/UserContext';
 import { AiProvider } from './src/context/AiContext';
-import Dashboard from './src/pages/Dashboard';
-import Diary from './src/pages/Diary';
-import Stats from './src/pages/Stats';
-import Profile from './src/pages/Profile';
-import Login from './src/pages/Login';
+
+// Lazy load pages for better initial load performance
+const Dashboard = lazy(() => import('./src/pages/Dashboard'));
+const Diary = lazy(() => import('./src/pages/Diary'));
+const Stats = lazy(() => import('./src/pages/Stats'));
+const Profile = lazy(() => import('./src/pages/Profile'));
+const Login = lazy(() => import('./src/pages/Login'));
+
+// Loading component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen bg-dashboard">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
+      <p className="text-slate-500 text-sm font-medium">加载中...</p>
+    </div>
+  </div>
+);
 
 // 私有路由组件，用于保护需要登录才能访问的页面
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -50,49 +62,51 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const AppContent: React.FC = () => {
   return (
     <HashRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route 
-          path="/" 
-          element={
-            <PrivateRoute>
-              <AppLayout>
-                <Dashboard />
-              </AppLayout>
-            </PrivateRoute>
-          }
-        />
-        <Route 
-          path="/diary" 
-          element={
-            <PrivateRoute>
-              <AppLayout>
-                <Diary />
-              </AppLayout>
-            </PrivateRoute>
-          }
-        />
-        <Route 
-          path="/stats" 
-          element={
-            <PrivateRoute>
-              <AppLayout>
-                <Stats />
-              </AppLayout>
-            </PrivateRoute>
-          }
-        />
-        <Route 
-          path="/profile" 
-          element={
-            <PrivateRoute>
-              <AppLayout>
-                <Profile />
-              </AppLayout>
-            </PrivateRoute>
-          }
-        />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route 
+            path="/" 
+            element={
+              <PrivateRoute>
+                <AppLayout>
+                  <Dashboard />
+                </AppLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route 
+            path="/diary" 
+            element={
+              <PrivateRoute>
+                <AppLayout>
+                  <Diary />
+                </AppLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route 
+            path="/stats" 
+            element={
+              <PrivateRoute>
+                <AppLayout>
+                  <Stats />
+                </AppLayout>
+              </PrivateRoute>
+            }
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <PrivateRoute>
+                <AppLayout>
+                  <Profile />
+                </AppLayout>
+              </PrivateRoute>
+            }
+          />
+        </Routes>
+      </Suspense>
     </HashRouter>
   );
 };

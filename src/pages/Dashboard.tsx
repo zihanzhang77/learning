@@ -2,8 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { goalApi, statsApi, timerApi, timeConsumptionApi, attendanceApi } from '../services/api';
+import { goalApi, statsApi, timerApi, timeConsumptionApi, attendanceApi, userApi } from '../services/api';
 import Calendar from '../components/Calendar';
+import LearningProfileCard from '../components/LearningProfileCard';
 
 const Dashboard: React.FC = () => {
   const [mounted, setMounted] = useState(false);
@@ -23,6 +24,14 @@ const Dashboard: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [weeklyTimeData, setWeeklyTimeData] = useState<any[]>([]);
   const [streak, setStreak] = useState(0);
+  const [learningProfile, setLearningProfile] = useState({
+    topic: '',
+    target: '',
+    level: '',
+    planStartDate: '',
+    planEndDate: '',
+    detailedPlan: ''
+  });
 
   const { user } = useUser();
   const navigate = useNavigate();
@@ -40,53 +49,85 @@ const Dashboard: React.FC = () => {
     try {
       setLoading(true);
       const userId = user.id;
-      const today = new Date().toISOString().split('T')[0]; // 获取今天的日期
+      const todayDate = new Date();
+      const todayStr = todayDate.toISOString().split('T')[0];
       
-      // 获取目标
-      const goal = await goalApi.getGoal(userId);
+      // Calculate this week's date range
+      const currentDay = todayDate.getDay();
+      const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+      const monday = new Date(todayDate);
+      monday.setDate(todayDate.getDate() - daysToMonday);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const mondayStr = monday.toISOString().split('T')[0];
+      const sundayStr = sunday.toISOString().split('T')[0];
+
+      // Parallelize all requests with error handling
+      const safeRequest = async <T>(promise: Promise<T>, defaultValue: T): Promise<T> => {
+        try {
+          return await promise;
+        } catch (error) {
+          console.warn('Request failed (using default):', error);
+          return defaultValue;
+        }
+      };
+
+      const [
+        goal,
+        allStats,
+        attendanceList,
+        selectedDateData,
+        totalManualStudyHours,
+        todayStats,
+        weekly,
+        weeklyTimeData,
+        userData
+      ] = await Promise.all([
+        safeRequest(goalApi.getGoal(userId), { total_study_hours: 200, daily_study_hours: 2 }),
+        safeRequest(statsApi.getStats(userId, 'all'), { total_hours: 0 }),
+        safeRequest(attendanceApi.getAttendance(userId), []),
+        safeRequest(timeConsumptionApi.getTimeConsumption(userId, selectedDate), { study_hours: 0 }),
+        safeRequest(timeConsumptionApi.getTotalManualTime(userId), 0),
+        safeRequest(statsApi.getStats(userId, 'day'), { total_hours: 0 }),
+        safeRequest(statsApi.getWeeklyStats(userId), { labels: [], datasets: [] }),
+        safeRequest(timeConsumptionApi.getTimeConsumptionRange(userId, mondayStr, sundayStr), []),
+        safeRequest(userApi.getUser(userId), {})
+      ]);
+      
+      setLearningProfile({
+        topic: userData.learning_topic || '',
+        target: userData.target_goal || '',
+        level: userData.current_level || '',
+        planStartDate: userData.plan_start_date || '',
+        planEndDate: userData.plan_end_date || '',
+        detailedPlan: userData.learning_plan || ''
+      });
+
       setStudyGoal(goal.total_study_hours || 200);
       setDailyGoal(goal.daily_study_hours ? goal.daily_study_hours * 60 : 10);
       
-      // 获取累计统计
-      const allStats = await statsApi.getStats(userId, 'all');
-      
-      // 获取本月学习天数（基于签到数据）
-      const attendanceList = await attendanceApi.getAttendance(userId);
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      // 计算本月签到天数
+      // Calculate streak
+      const currentMonth = todayDate.getMonth();
+      const currentYear = todayDate.getFullYear();
       const monthStudyDays = attendanceList.filter((item: any) => {
         const d = new Date(item.date);
         return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
       }).length;
-      
       setStreak(monthStudyDays || 0);
       
-      // 获取选定日期的时间消耗数据
-      const selectedDateData = await timeConsumptionApi.getTimeConsumption(userId, selectedDate);
-      
-      // 获取用户所有的时间消耗数据以计算手动输入的总学习时长
-      const allTimeConsumption = await timeConsumptionApi.getTimeConsumptionRange(userId, '2000-01-01', '2099-12-31');
-      const totalManualStudyHours = allTimeConsumption.reduce((sum: number, item: any) => sum + (Number(item.study_hours) || 0), 0);
-      
-      // 计算总学习时长（学习计时时间 + 手动输入的学习时间）
+      // Calculate total study hours
       const totalTimerHours = Number(allStats.total_hours) || 0;
       const allStudyHours = totalTimerHours + totalManualStudyHours;
-      
-      // setTotalMinutes 存储的是总分钟数
       setTotalMinutes(Math.round(allStudyHours * 60));
       
-      // 获取今日统计
-      const todayStats = await statsApi.getStats(userId, 'day');
+      // Calculate today progress
       const dailyGoalMinutes = goal.daily_study_hours ? goal.daily_study_hours * 60 : 10;
-      
-      // 计算今日学习时长（学习计时时间 + 手动输入的学习时间）
       const todayStudyHours = (todayStats.total_hours || 0) + (selectedDateData.study_hours || 0);
       const todayMinutes = todayStudyHours * 60;
       const todayPercent = dailyGoalMinutes > 0 ? Math.min((todayMinutes / dailyGoalMinutes) * 100, 100) : 0;
       setTodayProgress(Math.round(todayPercent));
       
-      // 设置时间消耗数据
+      // Set time consumption input
       setTimeConsumption({
         work: 0,
         game: 0,
@@ -94,26 +135,9 @@ const Dashboard: React.FC = () => {
         study: selectedDateData.study_hours || ''
       });
       
-      // 获取每周数据
-      const weekly = await statsApi.getWeeklyStats(userId);
       setWeeklyData(weekly);
-      
-      // 计算本周的周一和周日的日期
-      const currentDate = new Date();
-      const currentDay = currentDate.getDay();
-      const daysToMonday = currentDay === 0 ? 6 : currentDay - 1; // 计算到周一的天数
-      const monday = new Date(currentDate);
-      monday.setDate(currentDate.getDate() - daysToMonday);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      
-      // 获取本周的时间消耗数据
-      const weeklyTimeData = await timeConsumptionApi.getTimeConsumptionRange(
-        userId,
-        monday.toISOString().split('T')[0],
-        sunday.toISOString().split('T')[0]
-      );
       setWeeklyTimeData(weeklyTimeData);
+
     } catch (error) {
       console.error('加载仪表盘数据失败:', error);
     } finally {
@@ -178,6 +202,17 @@ const Dashboard: React.FC = () => {
 
 
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-medium">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="px-6 pb-20">
       <nav className="flex items-center py-4 justify-between sticky top-0 bg-dashboard/80 backdrop-blur-xl z-10 -mx-6 px-6">
@@ -207,6 +242,14 @@ const Dashboard: React.FC = () => {
           <h3 className="text-sm font-bold text-slate-900">签到日历</h3>
         </div>
         <Calendar userId={user?.id} streak={streak} selectedDate={selectedDate} />
+      </div>
+
+      {/* 学习档案 */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-sm font-bold text-slate-900">学习档案</h3>
+        </div>
+        <LearningProfileCard learningProfile={learningProfile} />
       </div>
 
       {/* 时间消耗输入部分 */}
@@ -268,28 +311,28 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="flex items-end justify-between gap-3 h-full flex-1">
             {/* 生成周一至周日的数据 */}
-            {[1, 2, 3, 4, 5, 6, 0].map((dayIndex, idx) => {
-              const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-              const dayName = dayNames[dayIndex];
-              
-              // 计算当前周的对应日期
+            {(() => {
               const today = new Date();
               const currentDay = today.getDay();
               const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
               const monday = new Date(today);
               monday.setDate(today.getDate() - daysToMonday); // 本周一
-              
-              const targetDate = new Date(monday);
-              const targetDayIndex = dayIndex === 0 ? 6 : dayIndex - 1; // 转换成 0-6 (周一到周日)
-              targetDate.setDate(monday.getDate() + targetDayIndex);
-              
-              const isToday = dayIndex === currentDay;
-              
-              // 查找对应日期的数据
-              const dayData = weeklyTimeData.find(item => {
-                const itemDate = new Date(item.date);
-                return itemDate.toDateString() === targetDate.toDateString();
-              });
+
+              return [1, 2, 3, 4, 5, 6, 0].map((dayIndex, idx) => {
+                const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+                const dayName = dayNames[dayIndex];
+                
+                const targetDate = new Date(monday);
+                const targetDayIndex = dayIndex === 0 ? 6 : dayIndex - 1; // 转换成 0-6 (周一到周日)
+                targetDate.setDate(monday.getDate() + targetDayIndex);
+                
+                const isToday = dayIndex === currentDay;
+                
+                // 查找对应日期的数据
+                const dayData = weeklyTimeData.find(item => {
+                  const itemDate = new Date(item.date);
+                  return itemDate.toDateString() === targetDate.toDateString();
+                });
               
               const maxHours = 5;
               const study_hours = dayData?.study_hours || 0;
@@ -319,7 +362,7 @@ const Dashboard: React.FC = () => {
                   <span className={`text-[10px] font-black ${isToday ? 'text-slate-900' : 'text-slate-300'}`}>{dayName}</span>
                 </div>
               );
-            })}
+            })})()}
           </div>
         </div>
         <div className="flex justify-center gap-6 mt-6">

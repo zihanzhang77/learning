@@ -67,12 +67,20 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (!userId) return;
       
-      setLoading(true);
+      // 仅在没有用户数据时显示加载状态，实现静默刷新
+      if (!user && !parsedUser) {
+        setLoading(true);
+      }
+
       const userData = await userApi.getUser(userId);
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
-    } catch (error) {
-      console.error('刷新用户信息失败:', error);
+    } catch (error: any) {
+      console.warn('刷新用户信息失败 (可能处于离线模式):', error);
+      // 如果用户不存在（比如被删除了），则登出
+      if (error?.code === 'PGRST116') {
+        logout();
+      }
     } finally {
       setLoading(false);
     }

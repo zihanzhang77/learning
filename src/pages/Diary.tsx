@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
+import { useAi } from '../context/AiContext';
 import { diaryApi, aiApi } from '../services/api';
 import { format, subDays, addDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -15,13 +16,22 @@ interface Diary {
 
 const Diary: React.FC = () => {
   const { user } = useUser();
+  const { generateEncouragement, encouragementStates } = useAi();
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // const [isAnalyzing, setIsAnalyzing] = useState(false); // 使用 context 中的 loading 状态
   const [aiEncouragement, setAiEncouragement] = useState<string | null>(null);
+
+  // 获取当前日期的 AI 生成状态
+  const currentAiState = encouragementStates?.[selectedDate];
+  const isAnalyzing = currentAiState?.loading || false;
+  
+  // 优先显示 context 中的结果（即时生成的），其次显示数据库加载的
+  const displayEncouragement = currentAiState?.result || aiEncouragement;
+  const displayError = currentAiState?.error;
 
   // 加载历史日记列表
   useEffect(() => {
@@ -45,26 +55,23 @@ const Diary: React.FC = () => {
 
   const loadDiaryByDate = async (date: string) => {
     if (!user) return;
-    // 检查是否在已加载列表中
-    const existing = diaries.find(d => d.date === date);
-    if (existing) {
-      setTitle(existing.title);
-      setContent(existing.content);
-      setAiEncouragement(existing.ai_encouragement || null);
-      return;
+    
+    // 清空当前状态
+    setTitle('');
+    setContent('');
+    setAiEncouragement(null);
+
+    // 1. 获取日记内容
+    const diaryData = await diaryApi.getDiaryByDate(user.id, date);
+    if (diaryData) {
+      setTitle(diaryData.title);
+      setContent(diaryData.content);
     }
 
-    // 否则从 API 获取
-    const data = await diaryApi.getDiaryByDate(user.id, date);
-    if (data) {
-      setTitle(data.title);
-      setContent(data.content);
-      setAiEncouragement(data.ai_encouragement || null);
-    } else {
-      // 如果没有记录，清空输入框
-      setTitle('');
-      setContent('');
-      setAiEncouragement(null);
+    // 2. 独立获取 AI 鼓励内容（不再依赖 diaries 表字段）
+    const encouragement = await diaryApi.getAiEncouragement(user.id, date);
+    if (encouragement) {
+      setAiEncouragement(encouragement);
     }
   };
 
@@ -101,45 +108,46 @@ const Diary: React.FC = () => {
 
   const handleAiEncouragement = async () => {
     if (!user) return;
-    setIsAnalyzing(true);
+    
+    if (!content.trim()) {
+      showToast('请先写下今天的日记内容哦', 'error');
+      return;
+    }
+
+    // 1. 先自动保存日记内容，确保数据库中有记录
     try {
-      // 获取最近3天的日记内容
-      // 这里简化逻辑：取列表前3条（假设列表已按日期倒序）
-      // 实际应筛选日期
-      const recentDiaries = diaries.slice(0, 3).map(d => `日期:${d.date}\n标题:${d.title}\n内容:${d.content}`).join('\n---\n');
-      
-      if (!recentDiaries) {
-        setAiEncouragement("还没有足够的日记记录来生成鼓励哦，快去写一篇吧！");
-        return;
-      }
+      await diaryApi.saveDiary(user.id, selectedDate, title, content);
+    } catch (saveError) {
+      console.error('自动保存日记失败:', saveError);
+      // 如果保存失败，可能网络问题，但我们仍尝试生成AI回复（只是可能无法保存AI结果）
+    }
 
-      const prompt = `你是一个温暖、治愈的心理咨询师朋友。请根据我最近3天的日记内容，从以下四种鼓励结构中选择最适合我当前状态的一种，给我一段温暖、治愈的鼓励。字数要求：50-100字左右。
+    // 2. 构造 Prompt，只使用当天的内容
+    // 增加 "请基于以下内容" 的强调，防止AI产生幻觉
+    const currentDiary = `日期:${selectedDate}\n标题:${title}\n内容:${content}`;
+    
+    // 优化 Prompt：减少字数要求，强调简洁，加快生成速度
+    const prompt = `你是一个温暖、治愈的心理咨询师朋友。
+请**严格基于我今天写的日记内容**，给我一句温暖、治愈的鼓励。
+请不要编造日记中没有提到的事情，也不要使用通用的套话，要针对我日记里的具体细节（如特定的事件、情绪、想法）进行回应。
 
-四种结构参考：
-1. **捕捉微小突破**（适合：看起来有点不确定、自我怀疑时）：句式如“我注意到，你今天在‘XX细节’上和之前不一样了...这种‘不放过自己’的劲头，才是你今天最大的进展。”
-2. **赋予思考以重量**（适合：分享了复杂、碎片化的感悟时）：句式如“你这个视角很特别，它把‘A’和‘B’连起来了...这个‘质疑’本身，就是你和别人拉开差距的地方。”
-3. **对抗遗忘与孤独**（适合：处于长期积累期、正反馈较少时）：句式如“今天这个坎你迈过去了，下次遇到XX情况，你就有经验了...你比别人多一个‘此路不通’的预警，这就是优势。”
-4. **肯定分享行为本身**（适合：需要情感链接时）：句式如“谢谢你愿意把这些思考讲给我听...愿意把还没整理好的思路摊开来讲，这是一种很珍贵的开放和信任。”
+字数要求：50字以内。
 
 **心法**：把“你真棒”（评价）换成“我看见了……”（描述）。评价是俯视，描述是平视。
 
 我的日记内容：
-${recentDiaries}`;
-      const response = await aiApi.deepseek(prompt);
-      setAiEncouragement(response.answer);
-      
-      // 保存 AI 鼓励
-      try {
-        await diaryApi.saveAiEncouragement(user.id, selectedDate, response.answer);
-      } catch (saveError) {
-        console.error('保存 AI 鼓励失败:', saveError);
-        // 不阻断流程，因为已经在前端显示了
-      }
+${currentDiary}`;
+
+    // 3. 调用 Context 中的生成方法（支持后台生成）
+    try {
+      await generateEncouragement(selectedDate, prompt, user.id, async (result) => {
+        // 保存到独立的 ai_encouragements 表
+        await diaryApi.saveAiEncouragement(user.id, selectedDate, result);
+      });
+      // 成功后不需要手动 setAiEncouragement，因为 context 会更新
     } catch (error: any) {
       console.error(error);
-      setAiEncouragement(`AI 暂时休息了 (错误: ${error.message || '未知错误'})`);
-    } finally {
-      setIsAnalyzing(false);
+      showToast('生成请求失败', 'error');
     }
   };
 
@@ -238,14 +246,14 @@ ${recentDiaries}`;
             </div>
 
             {/* AI 鼓励展示区 */}
-            {aiEncouragement && (
+            {displayEncouragement && (
               <div className="mt-8 p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl animate-fade-in">
                 <div className="flex items-start gap-3">
                   <span className="text-xl">💌</span>
                   <div>
                     <h4 className="text-sm font-bold text-indigo-900 mb-2">来自 AI 的鼓励</h4>
                     <p className="text-indigo-800 text-sm leading-relaxed whitespace-pre-wrap">
-                      {aiEncouragement}
+                      {displayEncouragement}
                     </p>
                   </div>
                 </div>
